@@ -1,0 +1,28 @@
+{
+  "name": "library-management-system",
+  "version": "1.0.0",
+  "description": "Production-grade Full-Stack Library Management System (LMS)",
+  "scripts": {
+    "setup": "npm --prefix backend install && npm --prefix frontend install",
+    "seed": "npm --prefix backend run seed",
+    "server": "npm --prefix backend run dev",
+    "client": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"BACKEND,FRONTEND\" -c \"blue.bold,cyan.bold\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\""
+  },
+  "keywords": [
+    "library-management-system",
+    "lms",
+    "react",
+    "nodejs",
+    "express",
+    "mongodb",
+    "jwt",
+    "fine-management"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
