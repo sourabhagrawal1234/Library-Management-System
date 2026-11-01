@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Receipt,
   RotateCcw,
+  Bookmark,
   PlusCircle,
   Users,
   Check,
@@ -138,6 +139,10 @@ const StaffDashboard = () => {
         <Link to="/staff/returns" className="btn btn-secondary btn-sm">
           <RotateCcw size={15} />
           <span>Return Book</span>
+        </Link>
+        <Link to="/staff/reservations" className="btn btn-secondary btn-sm">
+          <Bookmark size={15} />
+          <span>Reservations ({stats.totalReservations || 0})</span>
         </Link>
         <Link to="/staff/members" className="btn btn-secondary btn-sm">
           <Users size={15} />

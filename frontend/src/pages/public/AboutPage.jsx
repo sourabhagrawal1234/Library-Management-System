@@ -47,6 +47,17 @@ const AboutPage = () => {
           </div>
         </div>
 
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <a
+            href="/rules"
+            className="btn btn-outline"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <FileText size={16} />
+            <span>View Complete Library Rules & Guidelines →</span>
+          </a>
+        </div>
+
         {/* FAQs */}
         <div className="card" style={{ padding: '2rem', marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

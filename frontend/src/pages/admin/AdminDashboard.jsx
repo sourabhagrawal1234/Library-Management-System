@@ -14,6 +14,7 @@ import {
   TrendingUp,
   FileBarChart2,
   FolderTree,
+  Bookmark,
   ArrowRight
 } from 'lucide-react';
 
@@ -77,9 +78,17 @@ const AdminDashboard = () => {
             <FileBarChart2 size={16} />
             <span>Generate Reports</span>
           </Link>
+          <Link to="/admin/users" className="btn btn-secondary btn-sm">
+            <Users size={16} />
+            <span>Students</span>
+          </Link>
           <Link to="/admin/staff" className="btn btn-secondary btn-sm">
             <ShieldCheck size={16} />
             <span>Manage Staff</span>
+          </Link>
+          <Link to="/admin/reservations" className="btn btn-secondary btn-sm">
+            <Bookmark size={16} />
+            <span>Reservations</span>
           </Link>
           <Link to="/admin/categories" className="btn btn-secondary btn-sm">
             <FolderTree size={16} />
@@ -91,7 +100,7 @@ const AdminDashboard = () => {
       {/* 8 KPI Stat Cards in 2 Rows matching Screen 15 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         {/* Row 1 */}
-        <StatCard title="Total Users" value={stats.totalUsers} icon={Users} color="blue" subtext="Registered students" />
+        <StatCard title="Total Students" value={stats.totalUsers} icon={Users} color="blue" subtext="Registered students" />
         <StatCard title="Total Books" value={stats.totalBooks} icon={BookOpen} color="green" subtext="Catalog titles" />
         <StatCard title="Issued Books" value={stats.issuedBooks} icon={BookMarked} color="amber" subtext="Currently loaned" />
         <StatCard title="Overdue Books" value={stats.overdueBooks} icon={AlertTriangle} color="red" subtext="Pending returns" />

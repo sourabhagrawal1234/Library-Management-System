@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   Users,
   Search,
@@ -10,26 +11,60 @@ import {
   Trash2,
   ToggleLeft,
   ToggleRight,
-  Shield,
-  KeyRound,
-  History
+  History,
+  GraduationCap,
+  Calendar,
+  Phone,
+  Mail,
+  BookOpen,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  UserCheck,
+  UserX
 } from 'lucide-react';
 
+const BRANCH_OPTIONS = [
+  'Computer Science & Engineering',
+  'Information Technology',
+  'Mechanical Engineering',
+  'Civil Engineering',
+  'Electrical Engineering',
+  'Electronics & Communication',
+  'Management Studies',
+  'Applied Sciences'
+];
+
+const SEM_OPTIONS = [
+  '1st Sem / 1st Year',
+  '2nd Sem / 1st Year',
+  '3rd Sem / 2nd Year',
+  '4th Sem / 2nd Year',
+  '5th Sem / 3rd Year',
+  '6th Sem / 3rd Year',
+  '7th Sem / 4th Year',
+  '8th Sem / 4th Year'
+];
+
 const ManageUsersPage = () => {
-  const [users, setUsers] = useState([]);
+  const { user: currentUser } = useAuth();
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
 
   // Add / Edit Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingStudent, setEditingStudent] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     password: '',
-    role: 'user',
+    studentId: '',
+    branch: 'Computer Science & Engineering',
+    semYear: '1st Sem / 1st Year',
     address: ''
   });
   const [submitting, setSubmitting] = useState(false);
@@ -41,21 +76,23 @@ const ManageUsersPage = () => {
 
   const { showToast } = useToast();
 
-  const fetchUsers = async () => {
+  const fetchStudents = async () => {
     setLoading(true);
     try {
       const res = await api.get('/users', {
         params: {
+          role: 'student', // Strictly only students
           search: search.trim() || undefined,
-          role: roleFilter !== 'all' ? roleFilter : undefined
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          branch: branchFilter !== 'all' ? branchFilter : undefined
         }
       });
       if (res.data.success) {
-        setUsers(res.data.users);
+        setStudents(res.data.users);
       }
     } catch (err) {
-      console.error('Failed to load users:', err);
-      showToast('Error loading user directory', 'error');
+      console.error('Failed to load students:', err);
+      showToast('Error loading student directory', 'error');
     } finally {
       setLoading(false);
     }
@@ -63,45 +100,61 @@ const ManageUsersPage = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchUsers();
+      fetchStudents();
     }, 250);
     return () => clearTimeout(timer);
-  }, [search, roleFilter]);
+  }, [search, statusFilter, branchFilter]);
 
   const openAddModal = () => {
-    setEditingUser(null);
+    setEditingStudent(null);
     setFormData({
       name: '',
       email: '',
       phone: '',
       password: '',
-      role: 'user',
+      studentId: `STU-${Math.floor(1000 + Math.random() * 9000)}`,
+      branch: 'Computer Science & Engineering',
+      semYear: '1st Sem / 1st Year',
       address: ''
     });
     setIsModalOpen(true);
   };
 
-  const openEditModal = (user) => {
-    setEditingUser(user);
+  const openEditModal = (student) => {
+    setEditingStudent(student);
     setFormData({
-      name: user.name,
-      email: user.email,
-      phone: user.phone || '',
+      name: student.name,
+      email: student.email,
+      phone: student.phone || '',
       password: '',
-      role: user.role,
-      address: user.address || ''
+      studentId: student.studentId || '',
+      branch: student.branch || 'Computer Science & Engineering',
+      semYear: student.semYear || '1st Sem / 1st Year',
+      address: student.address || ''
     });
     setIsModalOpen(true);
   };
 
-  const handleToggleStatus = async (user) => {
+  const handleToggleStatus = async (student) => {
+    const isActivating = !student.isActive;
+    const confirmMessage = isActivating
+      ? `Are you sure you want to ACTIVATE student "${student.name}"?\n\nTheir library privileges, book borrowing, and student portal access will be immediately restored.`
+      : `Are you sure you want to DEACTIVATE student "${student.name}"?\n\nDeactivated students will NOT be able to log in, borrow books, or create reservations until reactivated.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
     try {
-      const res = await api.put(`/users/${user._id}`, {
-        isActive: !user.isActive
+      const res = await api.put(`/users/${student._id}`, {
+        isActive: isActivating
       });
       if (res.data.success) {
-        showToast(`User ${user.name} ${!user.isActive ? 'activated' : 'deactivated'}`, 'info');
-        fetchUsers();
+        showToast(
+          `Student "${student.name}" has been ${isActivating ? 'ACTIVATED' : 'DEACTIVATED'} successfully!`,
+          isActivating ? 'success' : 'warning'
+        );
+        fetchStudents();
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Status toggle failed', 'error');
@@ -109,44 +162,79 @@ const ManageUsersPage = () => {
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete user "${name}"?`)) {
+    if (!window.confirm(`Are you sure you want to delete student record for "${name}"?`)) {
       return;
     }
     try {
       const res = await api.delete(`/users/${id}`);
       if (res.data.success) {
-        showToast('User account deleted successfully', 'success');
-        fetchUsers();
+        showToast('Student record deleted successfully', 'success');
+        fetchStudents();
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to delete user', 'error');
+      showToast(err.response?.data?.message || 'Failed to delete student', 'error');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const trimmedName = (formData.name || '').trim();
+    if (!trimmedName) {
+      showToast('Please provide full student name', 'warning');
+      return;
+    }
+    if (!/^[a-zA-Z][a-zA-Z\s.'\-]{1,49}$/.test(trimmedName)) {
+      showToast('Name must contain only letters and spaces (2 to 50 characters). Numbers and special symbols are not allowed.', 'error');
+      return;
+    }
+
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) {
+      showToast('Please provide a valid email address (e.g. student@college.edu)', 'error');
+      return;
+    }
+
+    const cleanPhone = (formData.phone || '').trim().replace(/\D/g, '');
+    if (formData.phone && formData.phone.trim()) {
+      if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+        showToast('Phone number must be exactly 10 numeric digits starting with 6, 7, 8, or 9 (na kam, na jaada).', 'error');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
-      if (editingUser) {
-        const payload = { ...formData };
-        if (!payload.password) delete payload.password;
-        const res = await api.put(`/users/${editingUser._id}`, payload);
+      const payload = {
+        name: trimmedName,
+        email: formData.email.trim().toLowerCase(),
+        phone: cleanPhone,
+        studentId: (formData.studentId || '').trim(),
+        branch: formData.branch,
+        semYear: formData.semYear,
+        role: 'user',
+        address: (formData.address || '').trim()
+      };
+
+      if (editingStudent) {
+        if (formData.password) payload.password = formData.password;
+        const res = await api.put(`/users/${editingStudent._id}`, payload);
         if (res.data.success) {
-          showToast('User details updated successfully!', 'success');
+          showToast('Student details updated successfully!', 'success');
         }
       } else {
         if (!formData.password) {
-          showToast('Password is required for new user', 'warning');
+          showToast('Password is required for new student', 'warning');
           setSubmitting(false);
           return;
         }
-        const res = await api.post('/users', formData);
+        payload.password = formData.password;
+        const res = await api.post('/users', payload);
         if (res.data.success) {
-          showToast('New user registered successfully!', 'success');
+          showToast('New student registered successfully!', 'success');
         }
       }
       setIsModalOpen(false);
-      fetchUsers();
+      fetchStudents();
     } catch (err) {
       showToast(err.response?.data?.message || 'Operation failed', 'error');
     } finally {
@@ -154,16 +242,16 @@ const ManageUsersPage = () => {
     }
   };
 
-  const viewHistory = async (user) => {
-    setHistoryModalUser(user);
+  const viewHistory = async (student) => {
+    setHistoryModalUser(student);
     setHistoryLoading(true);
     try {
-      const res = await api.get(`/users/${user._id}`);
+      const res = await api.get(`/users/${student._id}`);
       if (res.data.success) {
         setUserHistory(res.data);
       }
     } catch (err) {
-      console.error('Error fetching user history:', err);
+      console.error('Error fetching student history:', err);
     } finally {
       setHistoryLoading(false);
     }
@@ -174,16 +262,16 @@ const ManageUsersPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a' }}>
-            System User Management
+            Student Management
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            Maintain student and administrative identities, modify permission assignments, and toggle account states.
+            Maintain student academic profiles, student IDs, branch records, and library access status.
           </p>
         </div>
 
         <button onClick={openAddModal} className="btn btn-primary">
           <UserPlus size={16} />
-          <span>Add New User</span>
+          <span>Add New Student</span>
         </button>
       </div>
 
@@ -194,7 +282,7 @@ const ManageUsersPage = () => {
           <input
             type="text"
             className="form-control"
-            placeholder="Search by name, email, or phone..."
+            placeholder="Search by student name, email, roll number, or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -203,95 +291,199 @@ const ManageUsersPage = () => {
         <div style={{ flex: '1 1 180px' }}>
           <select
             className="form-control"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">All Roles</option>
-            <option value="user">Students (User)</option>
-            <option value="staff">Staff Members</option>
-            <option value="admin">Administrators</option>
+            <option value="all">All Statuses</option>
+            <option value="active">Active Students</option>
+            <option value="inactive">Deactivated Students</option>
+          </select>
+        </div>
+
+        <div style={{ flex: '1 1 220px' }}>
+          <select
+            className="form-control"
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+          >
+            <option value="all">All Academic Branches</option>
+            {BRANCH_OPTIONS.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Users Table */}
+      {/* Students Table */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '4rem 0' }}>
-          <div className="spinner"></div>
-          <p style={{ color: '#64748b' }}>Loading user directory...</p>
+        <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p style={{ color: '#64748b' }}>Loading student records...</p>
         </div>
-      ) : users.length === 0 ? (
+      ) : students.length === 0 ? (
         <div className="empty-state">
-          <Users className="empty-icon" />
-          <h3 className="empty-title">No users matched</h3>
-          <p className="empty-description">Try expanding your search query or reset role filters.</p>
+          <GraduationCap className="empty-icon" size={48} />
+          <h3 className="empty-title">No Students Found</h3>
+          <p className="empty-description">Try expanding your search query or reset the branch/status filters.</p>
         </div>
       ) : (
         <div className="table-container">
           <table className="table">
             <thead>
               <tr>
-                <th>User Details</th>
-                <th>Role</th>
-                <th>Phone</th>
+                <th>Student Profile</th>
+                <th>Academic Details</th>
+                <th>Contact</th>
                 <th>Status</th>
                 <th>Registered</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u._id}>
+              {students.map((s) => (
+                <tr key={s._id}>
                   <td>
-                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{u.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{u.email}</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{s.name}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <Mail size={12} /> {s.email}
+                    </div>
                   </td>
                   <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-overdue' : u.role === 'staff' ? 'badge-active' : 'badge-available'}`}>
-                      {u.role.toUpperCase()}
-                    </span>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e40af' }}>
+                      {s.studentId || 'No ID Assigned'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                      {s.branch || 'General'}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      {s.semYear || '1st Sem'}
+                    </div>
                   </td>
-                  <td>{u.phone || '—'}</td>
                   <td>
-                    <button
-                      onClick={() => handleToggleStatus(u)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
-                      title="Click to toggle status"
-                    >
-                      {u.isActive ? (
-                        <span style={{ color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <ToggleRight size={22} /> Active
+                    <div style={{ fontSize: '0.82rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Phone size={12} /> {s.phone || '—'}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
+                      {/* Current Status Badge */}
+                      {s.isActive ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                            border: '1px solid #86efac'
+                          }}
+                          title="Student account is currently active"
+                        >
+                          <CheckCircle2 size={12} /> Active
                         </span>
                       ) : (
-                        <span style={{ color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <ToggleLeft size={22} /> Deactivated
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            backgroundColor: '#fee2e2',
+                            color: '#b91c1c',
+                            border: '1px solid #fca5a5'
+                          }}
+                          title="Student account is currently deactivated"
+                        >
+                          <XCircle size={12} /> Deactivated
                         </span>
                       )}
-                    </button>
+
+                      {/* Explicit Action Button */}
+                      {s.isActive ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(s)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '0.25rem 0.55rem',
+                            borderRadius: '5px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: '#b91c1c',
+                            backgroundColor: '#fff',
+                            border: '1px solid #fca5a5',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={`Click to DEACTIVATE ${s.name}`}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
+                        >
+                          <UserX size={12} /> Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(s)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '0.25rem 0.55rem',
+                            borderRadius: '5px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: '#15803d',
+                            backgroundColor: '#fff',
+                            border: '1px solid #86efac',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={`Click to ACTIVATE ${s.name}`}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f0fdf4'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
+                        >
+                          <UserCheck size={12} /> Activate
+                        </button>
+                      )}
+                    </div>
                   </td>
-                  <td>{new Date(u.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      {new Date(s.createdAt).toLocaleDateString()}
+                    </div>
+                  </td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <button
-                        onClick={() => viewHistory(u)}
+                        onClick={() => viewHistory(s)}
                         className="btn btn-secondary btn-sm"
-                        title="View Loan History"
+                        title="View Borrowing History"
                         style={{ padding: '0.35rem 0.55rem' }}
                       >
                         <History size={14} />
                       </button>
                       <button
-                        onClick={() => openEditModal(u)}
+                        onClick={() => openEditModal(s)}
                         className="btn btn-secondary btn-sm"
-                        title="Edit User"
+                        title="Edit Student"
                         style={{ padding: '0.35rem 0.55rem' }}
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
-                        onClick={() => handleDelete(u._id, u.name)}
+                        onClick={() => handleDelete(s._id, s.name)}
                         className="btn btn-danger btn-sm"
-                        title="Delete User"
+                        title="Delete Student Record"
                         style={{ padding: '0.35rem 0.55rem' }}
                       >
                         <Trash2 size={14} />
@@ -305,11 +497,12 @@ const ManageUsersPage = () => {
         </div>
       )}
 
-      {/* Add / Edit User Modal */}
+      {/* Add / Edit Student Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingUser ? 'Edit User Account' : 'Register New User'}
+        title={editingStudent ? `Edit Student: ${editingStudent.name}` : 'Register New Student'}
+        maxWidth="650px"
       >
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -317,52 +510,83 @@ const ManageUsersPage = () => {
             <input
               type="text"
               className="form-control"
+              placeholder="e.g. Rahul Sharma"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Email Address *</label>
-            <input
-              type="email"
-              className="form-control"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              disabled={!!editingUser}
-            />
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label className="form-label">Phone</label>
+              <label className="form-label">Email Address *</label>
               <input
-                type="tel"
+                type="email"
                 className="form-control"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="student@college.edu"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                disabled={!!editingStudent}
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Role *</label>
+              <label className="form-label">Phone Number (10 Digits)</label>
+              <input
+                type="tel"
+                maxLength={10}
+                className="form-control"
+                placeholder="e.g. 9876543210"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Student / Enrollment ID *</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. STU-2026-001"
+                value={formData.studentId}
+                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Semester / Year *</label>
               <select
                 className="form-control"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                value={formData.semYear}
+                onChange={(e) => setFormData({ ...formData, semYear: e.target.value })}
               >
-                <option value="user">Student (User)</option>
-                <option value="staff">Library Staff</option>
-                <option value="admin">Administrator</option>
+                {SEM_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
           </div>
 
           <div className="form-group">
+            <label className="form-label">Branch / Department *</label>
+            <select
+              className="form-control"
+              value={formData.branch}
+              onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+            >
+              {BRANCH_OPTIONS.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">
-              {editingUser ? 'New Password (Leave blank to keep current)' : 'Password *'}
+              {editingStudent ? 'New Password (Leave blank to keep current)' : 'Account Password *'}
             </label>
             <input
               type="password"
@@ -370,15 +594,16 @@ const ManageUsersPage = () => {
               placeholder="••••••••"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required={!editingUser}
+              required={!editingStudent}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Physical Address</label>
+            <label className="form-label">Hostel / Residential Address</label>
             <input
               type="text"
               className="form-control"
+              placeholder="Room / Hostel / City"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
@@ -397,7 +622,7 @@ const ManageUsersPage = () => {
               disabled={submitting}
               className="btn btn-primary"
             >
-              {submitting ? 'Saving...' : editingUser ? 'Update Account' : 'Create User'}
+              {submitting ? 'Saving...' : editingStudent ? 'Update Student Record' : 'Register Student'}
             </button>
           </div>
         </form>
@@ -417,7 +642,7 @@ const ManageUsersPage = () => {
           <div className="spinner"></div>
         ) : !userHistory?.issues || userHistory.issues.length === 0 ? (
           <p style={{ color: '#64748b', fontSize: '0.9rem', textAlign: 'center', padding: '1.5rem' }}>
-            No issue or return records found for this account.
+            No issue or return records found for this student account.
           </p>
         ) : (
           <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

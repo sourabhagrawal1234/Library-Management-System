@@ -1,3 +1,6 @@
+const dns = require('node:dns');
+
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -33,6 +36,7 @@ app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/staff', require('./routes/staffRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/reservations', require('./routes/reservationRoutes'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -46,44 +50,65 @@ app.get('/api/health', (req, res) => {
 // Centralized error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
-const server = app.listen(PORT, () => {
-  console.log(`🚀 LMS Server is running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-});
+let server;
+let retryCount = 0;
+const MAX_RETRIES = 5;
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
+const startServer = () => {
+  server = app.listen(PORT, async () => {
+    console.log(`🚀 LMS Server is running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     try {
-      const { execSync } = require('child_process');
-      const output = execSync(`netstat -ano | findstr :${PORT}`).toString();
-      const lines = output.trim().split('\n');
-      for (const line of lines) {
-        if (line.includes('LISTENING')) {
-          const parts = line.trim().split(/\s+/);
-          const pid = parts[parts.length - 1];
-          if (pid && pid !== process.pid.toString() && pid !== '0') {
-            execSync(`taskkill /F /PID ${pid}`);
-            console.log(`⚡ Automatically freed port ${PORT} from lingering process (PID ${pid}). Restarting...`);
-            setTimeout(() => {
-              server.close();
-              server.listen(PORT);
-            }, 600);
-            return;
-          }
-        }
-      }
-    } catch (killErr) {
-      // Fall through to standard error output
+      const { syncReservationStatuses } = require('./controllers/reservationController');
+      await syncReservationStatuses();
+      console.log('🔖 Reservation queues automatically synchronized.');
+    } catch (syncErr) {
+      console.error('Reservation sync warning on boot:', syncErr.message);
     }
-    console.error(`\n❌ Error: Port ${PORT} is already in use by another process.`);
-    console.error(`💡 Tip: Run 'Stop-Process -Name node -Force' in PowerShell or terminate the process using port ${PORT}.\n`);
-    process.exit(1);
-  } else {
-    console.error('Server error:', err);
-    process.exit(1);
-  }
-});
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      retryCount++;
+      if (retryCount <= MAX_RETRIES) {
+        try {
+          const { execSync } = require('child_process');
+          const output = execSync(`netstat -ano | findstr :${PORT}`).toString();
+          const lines = output.trim().split('\n');
+          for (const line of lines) {
+            if (line.includes('LISTENING')) {
+              const parts = line.trim().split(/\s+/);
+              const pid = parts[parts.length - 1];
+              if (pid && pid !== process.pid.toString() && pid !== '0') {
+                try {
+                  execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
+                  console.log(`⚡ Freed port ${PORT} from PID ${pid}. Retrying (${retryCount}/${MAX_RETRIES})...`);
+                } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+
+        setTimeout(() => {
+          try {
+            server.close();
+          } catch (_) {}
+          startServer();
+        }, 1000);
+        return;
+      }
+
+      console.error(`\n❌ Error: Port ${PORT} could not be freed after ${MAX_RETRIES} attempts.`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+      process.exit(1);
+    }
+  });
+};
+
+startServer();
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {

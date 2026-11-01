@@ -20,6 +20,7 @@ const ReturnBooksPage = () => {
 
   // Return confirmation state
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [returnCondition, setReturnCondition] = useState('Good');
   const [returnResult, setReturnResult] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -65,12 +66,15 @@ const ReturnBooksPage = () => {
     setProcessing(true);
 
     try {
-      const res = await api.put(`/issues/${selectedIssue._id}/return`);
+      const res = await api.put(`/issues/${selectedIssue._id}/return`, {
+        returnCondition
+      });
       if (res.data.success) {
         setReturnResult({
           message: res.data.message,
           fine: res.data.fine,
-          issue: res.data.issue
+          issue: res.data.issue,
+          reservationAlert: res.data.reservationAlert
         });
         showToast(res.data.message, res.data.fine ? 'warning' : 'success');
         fetchIssuedBooks();
@@ -210,6 +214,25 @@ const ReturnBooksPage = () => {
               <div style={{ marginTop: '4px' }}><strong>Book:</strong> {selectedIssue.book?.title}</div>
               <div style={{ marginTop: '4px' }}><strong>Due Date:</strong> {new Date(selectedIssue.dueDate).toLocaleDateString()}</div>
               <div style={{ marginTop: '4px' }}><strong>Return Date:</strong> Today ({new Date().toLocaleDateString()})</div>
+              
+              {/* Book Condition (ER / UML Spec) */}
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                  Book Physical Condition:
+                </label>
+                <select
+                  className="form-control"
+                  style={{ fontSize: '0.85rem', padding: '0.4rem 0.65rem' }}
+                  value={returnCondition}
+                  onChange={(e) => setReturnCondition(e.target.value)}
+                >
+                  <option value="Good">Good (Normal Condition)</option>
+                  <option value="Fair">Fair (Minor Wear)</option>
+                  <option value="Damaged">Damaged</option>
+                  <option value="Lost">Lost</option>
+                </select>
+              </div>
+
               {selectedIssue.computedStatus === 'overdue' && (
                 <div style={{ marginTop: '8px', color: '#dc2626', fontWeight: 700 }}>
                   ⚠️ Overdue by approximately {selectedIssue.overdueDays} days. Fine will be generated at ₹10/day.
@@ -247,6 +270,27 @@ const ReturnBooksPage = () => {
                 Available book copies have been automatically increased.
               </p>
             </div>
+
+            {returnResult.reservationAlert && (
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '10px',
+                  padding: '1rem',
+                  marginBottom: '1.25rem',
+                  color: '#92400e',
+                  fontSize: '0.875rem'
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: '2px' }}>
+                  🔔 Reservation Alert (Chapter 2.1 e):
+                </div>
+                <div>
+                  Student <strong>{returnResult.reservationAlert.studentName}</strong> was in the reservation waitlist and has been notified to pick up this book! (Held until {new Date(returnResult.reservationAlert.pickupDeadline).toLocaleDateString()}).
+                </div>
+              </div>
+            )}
 
             {returnResult.fine ? (
               <div

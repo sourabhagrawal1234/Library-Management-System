@@ -11,6 +11,9 @@ const ProfilePage = () => {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [address, setAddress] = useState(user?.address || '');
+  const [studentId, setStudentId] = useState(user?.studentId || '');
+  const [branch, setBranch] = useState(user?.branch || 'Computer Science & Engineering');
+  const [semYear, setSemYear] = useState(user?.semYear || '1st Sem / 1st Year');
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Password change state
@@ -21,9 +24,33 @@ const ProfilePage = () => {
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      showToast('Please provide your name', 'warning');
+      return;
+    }
+    if (!/^[a-zA-Z][a-zA-Z\s.'\-]{1,49}$/.test(trimmedName)) {
+      showToast('Name must contain only letters and spaces (2 to 50 characters). Numbers and special characters are not allowed.', 'error');
+      return;
+    }
+
+    const cleanPhone = phone.trim().replace(/\D/g, '');
+    if (phone.trim() && !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      showToast('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9 (na kam, na jaada).', 'error');
+      return;
+    }
+
     setSavingProfile(true);
     try {
-      const res = await api.put('/auth/profile', { name, phone, address });
+      const res = await api.put('/auth/profile', {
+        name: trimmedName,
+        phone: cleanPhone,
+        address: address ? address.trim() : '',
+        studentId: studentId ? studentId.trim() : undefined,
+        branch,
+        semYear
+      });
       if (res.data.success) {
         updateUser(res.data.user);
         showToast('Profile information updated successfully!', 'success');
@@ -113,11 +140,21 @@ const ProfilePage = () => {
               {user?.name}
             </h2>
             <span className="badge badge-available">
-              <Shield size={12} /> {user?.role?.toUpperCase()}
+              <Shield size={12} /> {['user', 'student'].includes(user?.role) ? 'STUDENT' : user?.role?.toUpperCase()}
             </span>
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.85rem', color: '#64748b', marginTop: '0.5rem' }}>
+            {['user', 'student'].includes(user?.role) && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#1d4ed8', fontWeight: 700 }}>
+                Student ID: {user?.studentId || 'STU-1001'}
+              </span>
+            )}
+            {['user', 'student'].includes(user?.role) && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#047857', fontWeight: 600 }}>
+                {user?.branch || 'Computer Science & Engineering'} · {user?.semYear || '1st Sem'}
+              </span>
+            )}
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Mail size={14} /> {user?.email}
             </span>
@@ -163,14 +200,67 @@ const ProfilePage = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Phone Number</label>
+              <label className="form-label">Phone Number (10 Digits)</label>
               <input
                 type="tel"
+                maxLength={10}
                 className="form-control"
+                placeholder="10-digit mobile number"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
               />
             </div>
+
+            {['user', 'student'].includes(user?.role) && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Student ID / Enrollment Number</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    placeholder="e.g. STU-2026-001"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Academic Semester / Year</label>
+                    <select
+                      className="form-control"
+                      value={semYear}
+                      onChange={(e) => setSemYear(e.target.value)}
+                    >
+                      <option value="1st Sem / 1st Year">1st Sem / 1st Year</option>
+                      <option value="2nd Sem / 1st Year">2nd Sem / 1st Year</option>
+                      <option value="3rd Sem / 2nd Year">3rd Sem / 2nd Year</option>
+                      <option value="4th Sem / 2nd Year">4th Sem / 2nd Year</option>
+                      <option value="5th Sem / 3rd Year">5th Sem / 3rd Year</option>
+                      <option value="6th Sem / 3rd Year">6th Sem / 3rd Year</option>
+                      <option value="7th Sem / 4th Year">7th Sem / 4th Year</option>
+                      <option value="8th Sem / 4th Year">8th Sem / 4th Year</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Branch / Department</label>
+                    <select
+                      className="form-control"
+                      value={branch}
+                      onChange={(e) => setBranch(e.target.value)}
+                    >
+                      <option value="Computer Science & Engineering">Computer Science & Engineering</option>
+                      <option value="Information Technology">Information Technology</option>
+                      <option value="Mechanical Engineering">Mechanical Engineering</option>
+                      <option value="Civil Engineering">Civil Engineering</option>
+                      <option value="Electrical Engineering">Electrical Engineering</option>
+                      <option value="Electronics & Communication">Electronics & Communication</option>
+                      <option value="Business Administration (MBA)">Business Administration (MBA)</option>
+                      <option value="Science & Humanities">Science & Humanities</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="form-group">
               <label className="form-label">Address / Hostel Location</label>

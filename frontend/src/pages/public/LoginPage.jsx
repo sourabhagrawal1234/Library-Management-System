@@ -106,14 +106,14 @@ const LoginPage = () => {
 
           {/* Right Form Card (Screen 2 Reference) */}
           <div className="auth-form-side">
-            {/* Role Switcher Tabs */}
+            {/* Role Switcher Tabs (Student, Staff, Admin) */}
             <div className="role-segmented-tabs">
               <button
                 type="button"
-                className={`role-segmented-tab ${email.includes('student') || email.includes('rahul') || (!email.includes('staff') && !email.includes('admin')) ? 'active' : ''}`}
-                onClick={() => setDemoCredentials('user')}
+                className={`role-segmented-tab ${email.includes('student') || email.includes('rahul') || email.includes('sarita') || (!email.includes('staff') && !email.includes('admin')) ? 'active' : ''}`}
+                onClick={() => setDemoCredentials('student')}
               >
-                User
+                Student
               </button>
               <button
                 type="button"
@@ -156,9 +156,9 @@ const LoginPage = () => {
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                   <label className="form-label" style={{ margin: 0 }}>Password</label>
-                  <a href="#forgot" onClick={(e) => { e.preventDefault(); showToast('Demo accounts password is: Admin@123 / Staff@123 / Student@123', 'info'); }} style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>
+                  <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <input
                   type="password"

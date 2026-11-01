@@ -1,5 +1,6 @@
 const Staff = require('../models/Staff');
 const User = require('../models/User');
+const { isValidPersonName, isValidPhone, isValidEmail, sanitizePhone, isValidIdentifier } = require('../utils/validator');
 
 // @desc    Get all staff members
 // @route   GET /api/staff
@@ -34,6 +35,36 @@ const createStaff = async (req, res, next) => {
       });
     }
 
+    if (!isValidPersonName(name)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid name. Staff name must contain only letters and spaces (2 to 50 characters).'
+      });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address'
+      });
+    }
+
+    if (phone && phone.trim()) {
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid phone number. Must be exactly 10 numeric digits starting with 6, 7, 8, or 9 (na kam, na jaada).'
+        });
+      }
+    }
+
+    if (!isValidIdentifier(employeeId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Employee ID. Must be alphanumeric and hyphens only (e.g. EMP-101).'
+      });
+    }
+
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(409).json({
@@ -52,9 +83,9 @@ const createStaff = async (req, res, next) => {
 
     const user = await User.create({
       name: name.trim(),
-      email: email.toLowerCase(),
+      email: email.toLowerCase().trim(),
       password,
-      phone: phone || '',
+      phone: sanitizePhone(phone),
       role: 'staff'
     });
 
@@ -92,6 +123,23 @@ const updateStaff = async (req, res, next) => {
       });
     }
 
+    // Protection: If staff user is admin or current user, prevent deactivation
+    const staffUserCheck = await User.findById(staff.user);
+    if (staffUserCheck) {
+      if (staffUserCheck.role === 'admin' && isActive === false) {
+        return res.status(400).json({
+          success: false,
+          message: 'Administrator accounts cannot be deactivated.'
+        });
+      }
+      if (req.user && staffUserCheck._id.toString() === req.user._id.toString() && isActive === false) {
+        return res.status(400).json({
+          success: false,
+          message: 'You cannot deactivate your own logged-in account.'
+        });
+      }
+    }
+
     if (department) staff.department = department.trim();
     if (designation) staff.designation = designation.trim();
     if (isActive !== undefined) staff.isActive = isActive;
@@ -100,8 +148,26 @@ const updateStaff = async (req, res, next) => {
     // Also update associated user
     const user = await User.findById(staff.user);
     if (user) {
-      if (name) user.name = name.trim();
-      if (phone !== undefined) user.phone = phone;
+      if (name !== undefined) {
+        if (!isValidPersonName(name)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid name. Staff name must contain only letters and spaces (2 to 50 characters).'
+          });
+        }
+        user.name = name.trim();
+      }
+      if (phone !== undefined && phone !== '') {
+        if (!isValidPhone(phone)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid phone number. Must be exactly 10 numeric digits starting with 6-9.'
+          });
+        }
+        user.phone = sanitizePhone(phone);
+      } else if (phone === '') {
+        user.phone = '';
+      }
       if (isActive !== undefined) user.isActive = isActive;
       await user.save();
     }
@@ -134,6 +200,21 @@ const deleteStaff = async (req, res, next) => {
 
     // Delete staff profile and associated user
     const userId = staff.user;
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user && user.role === 'admin') {
+        return res.status(400).json({
+          success: false,
+          message: 'Administrator accounts cannot be deleted.'
+        });
+      }
+      if (req.user && user && user._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'You cannot delete your own account while logged in.'
+        });
+      }
+    }
     await staff.deleteOne();
     if (userId) {
       await User.findByIdAndDelete(userId);

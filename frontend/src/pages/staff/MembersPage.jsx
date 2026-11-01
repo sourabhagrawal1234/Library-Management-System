@@ -105,7 +105,10 @@ const MembersPage = () => {
                 <tr key={m._id}>
                   <td>
                     <div style={{ fontWeight: 600, color: '#0f172a' }}>{m.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>
+                      ID: {m.studentId || 'N/A'} • {m.branch || 'CSE'} ({m.semYear || 'Sem 4'})
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                       Joined {new Date(m.createdAt).toLocaleDateString()}
                     </div>
                   </td>

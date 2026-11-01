@@ -213,16 +213,55 @@ const ManageBooksPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const trimmedTitle = (formData.title || '').trim();
+    if (!trimmedTitle || trimmedTitle.length < 2 || !/[a-zA-Z]{2,}/.test(trimmedTitle)) {
+      showToast('Book title must contain valid alphabets (at least 2 characters)', 'error');
+      return;
+    }
+
+    const trimmedAuthor = (formData.author || '').trim();
+    if (!trimmedAuthor || !/^[a-zA-Z][a-zA-Z\s.,&'\-]{1,79}$/.test(trimmedAuthor)) {
+      showToast('Author name must contain only letters and valid punctuation (2 to 80 characters)', 'error');
+      return;
+    }
+
+    const cleanIsbn = (formData.isbn || '').trim().replace(/[-\s]/g, '');
+    if (!/^(\d{10}|\d{13}|\d{9}[\dX])$/i.test(cleanIsbn)) {
+      showToast('ISBN must be a valid 10 or 13-digit number (e.g. 978-0132350884)', 'error');
+      return;
+    }
+
+    const total = Number(formData.totalCopies);
+    if (!Number.isInteger(total) || total < 1 || total > 1000) {
+      showToast('Total copies must be a positive integer between 1 and 1000', 'error');
+      return;
+    }
+
+    const available = Number(formData.availableCopies);
+    if (!Number.isInteger(available) || available < 0 || available > total) {
+      showToast(`Available copies must be an integer between 0 and total copies (${total})`, 'error');
+      return;
+    }
+
+    if (formData.publicationYear) {
+      const year = Number(formData.publicationYear);
+      if (!Number.isInteger(year) || year < 1000 || year > new Date().getFullYear() + 1) {
+        showToast(`Publication year must be between 1000 and ${new Date().getFullYear() + 1}`, 'error');
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
       if (editingBook) {
-        const res = await api.put(`/books/${editingBook._id}`, formData);
+        const res = await api.put(`/books/${editingBook._id}`, { ...formData, totalCopies: total, availableCopies: available });
         if (res.data.success) {
           showToast('Book details updated successfully!', 'success');
         }
       } else {
-        const res = await api.post('/books', formData);
+        const res = await api.post('/books', { ...formData, totalCopies: total, availableCopies: available });
         if (res.data.success) {
           showToast('New book successfully cataloged!', 'success');
         }

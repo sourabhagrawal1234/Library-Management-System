@@ -1,26 +1,38 @@
 const User = require('../models/User');
 const Issue = require('../models/Issue');
 const Fine = require('../models/Fine');
+const { isValidPersonName, isValidPhone, isValidEmail, sanitizePhone, isValidIdentifier } = require('../utils/validator');
 
 // @desc    Get all users with filtering and search
 // @route   GET /api/users
 // @access  Private (Admin)
 const getUsers = async (req, res, next) => {
   try {
-    const { role, status, search } = req.query;
+    const { role, status, search, branch } = req.query;
     const query = {};
 
     if (role && role !== 'all') {
-      query.role = role;
+      if (role === 'user' || role === 'student') {
+        query.role = { $in: ['user', 'student'] };
+      } else {
+        query.role = role;
+      }
+    } else if (!role) {
+      // Default to students when no explicit role is passed
+      query.role = { $in: ['user', 'student'] };
     }
 
     if (status && status !== 'all') {
       query.isActive = status === 'active';
     }
 
+    if (branch && branch !== 'all') {
+      query.branch = branch;
+    }
+
     if (search && search.trim()) {
       const regex = new RegExp(search.trim(), 'i');
-      query.$or = [{ name: regex }, { email: regex }, { phone: regex }];
+      query.$or = [{ name: regex }, { email: regex }, { phone: regex }, { studentId: regex }, { branch: regex }];
     }
 
     const users = await User.find(query).select('-password').sort({ createdAt: -1 });
@@ -41,11 +53,11 @@ const getUsers = async (req, res, next) => {
 const getMemberRecords = async (req, res, next) => {
   try {
     const { search } = req.query;
-    const query = { role: 'user' };
+    const query = { role: { $in: ['user', 'student'] } };
 
     if (search && search.trim()) {
       const regex = new RegExp(search.trim(), 'i');
-      query.$or = [{ name: regex }, { email: regex }, { phone: regex }];
+      query.$or = [{ name: regex }, { email: regex }, { phone: regex }, { studentId: regex }];
     }
 
     const members = await User.find(query).select('-password').sort({ name: 1 });
@@ -126,12 +138,42 @@ const getUserById = async (req, res, next) => {
 // @access  Private (Admin)
 const createUser = async (req, res, next) => {
   try {
-    const { name, email, password, phone, role, address } = req.body;
+    const { name, email, password, phone, role, address, studentId, branch, semYear } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Name, email, and password are required'
+      });
+    }
+
+    if (!isValidPersonName(name)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid name. Name must contain only letters and spaces (2 to 50 characters). Numbers and special symbols are not allowed.'
+      });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address (e.g. student@college.edu)'
+      });
+    }
+
+    if (phone && phone.trim()) {
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid phone number. Must be exactly 10 numeric digits starting with 6, 7, 8, or 9 (na kam, na jaada).'
+        });
+      }
+    }
+
+    if (studentId && studentId.trim() && !isValidIdentifier(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Student ID. Alphanumeric and hyphens only (e.g. STU-2026-001).'
       });
     }
 
@@ -143,20 +185,25 @@ const createUser = async (req, res, next) => {
       });
     }
 
+    const autoStudentId = studentId && studentId.trim() ? studentId.trim() : `STU-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
       password,
-      phone: phone || '',
+      phone: sanitizePhone(phone),
+      studentId: autoStudentId,
+      branch: branch || 'Computer Science & Engineering',
+      semYear: semYear || '1st Sem / 1st Year',
       role: role || 'user',
-      address: address || ''
+      address: address ? address.trim() : ''
     });
 
     const sanitizedUser = await User.findById(user._id).select('-password');
 
     res.status(201).json({
       success: true,
-      message: 'User created successfully',
+      message: 'Student account created successfully',
       user: sanitizedUser
     });
   } catch (error) {
@@ -169,7 +216,7 @@ const createUser = async (req, res, next) => {
 // @access  Private (Admin)
 const updateUser = async (req, res, next) => {
   try {
-    const { name, phone, role, address, isActive, password } = req.body;
+    const { name, phone, role, address, isActive, password, studentId, branch, semYear } = req.body;
     let user = await User.findById(req.params.id);
 
     if (!user) {
@@ -179,10 +226,57 @@ const updateUser = async (req, res, next) => {
       });
     }
 
-    if (name) user.name = name;
-    if (phone !== undefined) user.phone = phone;
+    // Protection 1: Admin accounts can NEVER be deactivated
+    if (user.role === 'admin' && isActive === false) {
+      return res.status(400).json({
+        success: false,
+        message: 'Administrator accounts are permanently active and cannot be deactivated to prevent system lockout.'
+      });
+    }
+
+    // Protection 2: Cannot deactivate self
+    if (req.user && user._id.toString() === req.user._id.toString() && isActive === false) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot deactivate your own logged-in account.'
+      });
+    }
+
+    // Protection 3: Cannot demote Administrator
+    if (user.role === 'admin' && role && role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Administrator accounts cannot be demoted to other roles.'
+      });
+    }
+
+    if (name !== undefined) {
+      if (!isValidPersonName(name)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid name. Name must contain only letters and spaces (2 to 50 characters).'
+        });
+      }
+      user.name = name.trim();
+    }
+
+    if (phone !== undefined && phone !== '') {
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid phone number. Must be exactly 10 numeric digits starting with 6-9.'
+        });
+      }
+      user.phone = sanitizePhone(phone);
+    } else if (phone === '') {
+      user.phone = '';
+    }
+
     if (role) user.role = role;
-    if (address !== undefined) user.address = address;
+    if (address !== undefined) user.address = address.trim();
+    if (studentId !== undefined && studentId.trim()) user.studentId = studentId.trim();
+    if (branch !== undefined) user.branch = branch.trim();
+    if (semYear !== undefined) user.semYear = semYear.trim();
     if (isActive !== undefined) user.isActive = isActive;
     if (password && password.length >= 6) user.password = password;
 
@@ -211,6 +305,22 @@ const deleteUser = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'User not found'
+      });
+    }
+
+    // Protection 1: Admin accounts cannot be deleted
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Administrator accounts cannot be deleted.'
+      });
+    }
+
+    // Protection 2: Cannot delete own account
+    if (req.user && user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account while logged in.'
       });
     }
 

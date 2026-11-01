@@ -11,6 +11,7 @@ const Book = require('./models/Book');
 const Issue = require('./models/Issue');
 const Fine = require('./models/Fine');
 const Payment = require('./models/Payment');
+const Reservation = require('./models/Reservation');
 
 const seedData = async () => {
   try {
@@ -26,6 +27,7 @@ const seedData = async () => {
     await Issue.deleteMany();
     await Fine.deleteMany();
     await Payment.deleteMany();
+    await Reservation.deleteMany();
     console.log('🧹 Purged existing collections.');
 
     // 1. Seed Users
@@ -48,10 +50,13 @@ const seedData = async () => {
     });
 
     const studentUser = await User.create({
-      name: 'Demo Student',
+      name: 'Sourabh Agrawal',
       email: 'student@library.com',
       password: 'Student@123',
       phone: '+91 98765 43210',
+      studentId: 'STU-2026-001',
+      semYear: '4th Sem / 2nd Year',
+      branch: 'Computer Science & Engineering',
       role: 'user',
       address: 'Hostel Block 4, Room 218'
     });
@@ -61,6 +66,9 @@ const seedData = async () => {
       email: 'rahul@college.edu',
       password: 'Student@123',
       phone: '+91 98765 12345',
+      studentId: 'STU-2026-002',
+      semYear: '6th Sem / 3rd Year',
+      branch: 'Information Technology',
       role: 'user',
       address: 'Hostel Block 2, Room 105'
     });
@@ -70,8 +78,23 @@ const seedData = async () => {
       email: 'priya@college.edu',
       password: 'Student@123',
       phone: '+91 98765 67890',
+      studentId: 'STU-2026-003',
+      semYear: '2nd Sem / 1st Year',
+      branch: 'Electronics & Communication',
       role: 'user',
       address: 'Hostel Block 1, Room 302'
+    });
+
+    const studentSarita = await User.create({
+      name: 'Sarita Narwariya',
+      email: 'saritanarwariya474@gmail.com',
+      password: 'Student@123',
+      phone: '6268550970',
+      studentId: 'STU-2026-004',
+      semYear: '4th Sem / 2nd Year',
+      branch: 'Computer Science & Engineering',
+      role: 'user',
+      address: 'Campus Girls Hostel A, Room 12'
     });
 
     // 2. Seed Staff Profile
@@ -735,7 +758,38 @@ const seedData = async () => {
       paymentDate: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)
     });
 
+    // 7. Seed Book Reservations (Chapter 1.1 e & Solution 2.1 e)
+    await Reservation.create({
+      book: cleanCodeBook._id,
+      user: studentUser._id,
+      priority: 1,
+      status: 'available_for_pickup',
+      reservationDate: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+      notifiedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
+      pickupDeadline: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000),
+      remarks: 'Returned copy ready for collection at Shelf ' + (cleanCodeBook.shelfLocation || 'Stack PR-204')
+    });
+
+    await Reservation.create({
+      book: cleanCodeBook._id,
+      user: studentRahul._id,
+      priority: 2,
+      status: 'pending',
+      reservationDate: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
+      remarks: 'Waiting in queue position #2'
+    });
+
+    await Reservation.create({
+      book: dsaBook._id,
+      user: studentSarita._id,
+      priority: 1,
+      status: 'pending',
+      reservationDate: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+      remarks: 'Awaiting return of Algorithms copy'
+    });
+
     console.log('💳 Seeded sample issues, fine records, and demo payment transactions.');
+    console.log('🔖 Seeded sample book reservations (Pending & Available for Pickup).');
     console.log('\n==========================================');
     console.log('🎉 SEEDING COMPLETED SUCCESSFULLY!');
     console.log('==========================================');

@@ -48,26 +48,34 @@ const DashboardLayout = () => {
 
   const getPageTitle = () => {
     const p = location.pathname;
-    if (p.includes('/dashboard')) return user?.role === 'admin' ? 'Admin Dashboard' : user?.role === 'staff' ? 'Staff Dashboard' : 'Dashboard';
+    if (p.includes('/dashboard')) return user?.role === 'admin' ? 'Admin Dashboard' : user?.role === 'staff' ? 'Staff Dashboard' : 'Student Dashboard';
     if (p.includes('/search-books')) return 'Search Books';
-    if (p.includes('/my-books')) return 'My Issued Books';
-    if (p.includes('/my-fines')) return 'My Fines & Fees';
+    if (p.includes('/my-books')) return 'My Books';
+    if (p.includes('/reservations')) return user?.role === 'user' ? 'My Reservations' : 'Book Reservations & Waitlists';
+    if (p.includes('/my-fines')) return 'My Fines';
     if (p.includes('/payment-history')) return 'Payment History';
     if (p.includes('/payment-success')) return 'Payment Receipt';
+    if (p.includes('/transaction/')) return 'Transaction Details';
     if (p.includes('/payment/')) return 'Pay Library Fine';
-    if (p.includes('/profile')) return 'Account Profile';
-    if (p.includes('/users')) return 'Manage Users';
-    if (p.includes('/staff')) return 'Manage Staff';
+    if (p.includes('/profile')) return user?.role === 'admin' ? 'Admin Profile' : user?.role === 'staff' ? 'Staff Profile' : 'Student Profile';
+    if (p.includes('/users')) return 'Manage Students';
+    if (p.includes('/admin/staff')) return 'Manage Staff';
     if (p.includes('/categories')) return 'Manage Categories';
     if (p.includes('/issue-requests')) return 'Issue Requests';
     if (p.includes('/issued-books')) return 'Active Issued Books';
-    if (p.includes('/returns')) return 'Book Returns';
-    if (p.includes('/members')) return 'Library Members';
+    if (p.includes('/issues')) return 'Master Circulation Records';
+    if (p.includes('/returns')) return user?.role === 'admin' ? 'Historical Return Records' : 'Returns Management';
+    if (p.includes('/members')) return 'Student Member Registry';
     if (p.includes('/fines')) return 'Fine Management';
-    if (p.includes('/reports')) return 'Reports & Analytics';
-    if (p.includes('/books')) return 'Manage Books';
-    return 'Library Dashboard';
+    if (p.includes('/payments')) return 'Financial Payment Records';
+    if (p.includes('/reports')) return 'Library Reports & Analytics';
+    if (p.includes('/books')) return user?.role === 'admin' ? 'Manage Books' : 'Book Inventory';
+    return 'Library LMS';
   };
+
+  useEffect(() => {
+    document.title = `${getPageTitle()} | Library LMS`;
+  }, [location.pathname, user?.role]);
 
   return (
     <div className="dashboard-layout">
@@ -132,7 +140,7 @@ const DashboardLayout = () => {
               }`}
               style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}
             >
-              {user?.role}
+              {['user', 'student'].includes(user?.role) ? 'STUDENT' : user?.role?.toUpperCase()}
             </span>
 
             {/* Profile Dropdown */}
@@ -170,10 +178,10 @@ const DashboardLayout = () => {
                 </div>
                 <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
-                    {user?.name?.split(' ')[0] || 'User'}
+                    {user?.name || 'Student'}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'capitalize' }}>
-                    {user?.role || 'Member'}
+                    {['user', 'student'].includes(user?.role) ? 'Student' : user?.role}
                   </div>
                 </div>
                 <ChevronDown size={14} color="#64748b" />
@@ -195,7 +203,7 @@ const DashboardLayout = () => {
                     <span>My Profile</span>
                   </Link>
 
-                  {user?.role === 'user' && (
+                  {['user', 'student'].includes(user?.role) && (
                     <>
                       <Link
                         to="/user/my-books"
@@ -245,7 +253,7 @@ const DashboardLayout = () => {
                         onClick={() => setDropdownOpen(false)}
                       >
                         <ShieldCheck size={16} />
-                        <span>Manage Users</span>
+                        <span>Manage Students</span>
                       </Link>
                       <Link
                         to="/admin/reports"

@@ -33,6 +33,15 @@ const issueSchema = new mongoose.Schema(
     returnDate: {
       type: Date
     },
+    returnCondition: {
+      type: String,
+      enum: ['Good', 'Fair', 'Damaged', 'Lost'],
+      default: 'Good'
+    },
+    receivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
     status: {
       type: String,
       enum: ['pending', 'approved', 'issued', 'returned', 'overdue', 'rejected'],

@@ -117,6 +117,21 @@ const approveRequest = async (req, res, next) => {
     }
     await book.save();
 
+    // Mark any active reservation for this student & book as fulfilled
+    const Reservation = require('../models/Reservation');
+    const userRes = await Reservation.findOne({
+      book: book._id,
+      user: issue.user,
+      status: { $in: ['pending', 'available_for_pickup'] }
+    });
+    if (userRes) {
+      userRes.status = 'fulfilled';
+      userRes.fulfilledAt = now;
+      await userRes.save();
+    }
+    const { syncReservationStatuses } = require('./reservationController');
+    await syncReservationStatuses(book._id);
+
     const populatedIssue = await Issue.findById(issue._id)
       .populate('book', 'title author isbn bookId shelfLocation image')
       .populate('user', 'name email phone')
@@ -231,6 +246,21 @@ const directIssue = async (req, res, next) => {
     }
     await book.save();
 
+    // Mark any active reservation for this student & book as fulfilled
+    const Reservation = require('../models/Reservation');
+    const userRes = await Reservation.findOne({
+      book: book._id,
+      user: user._id,
+      status: { $in: ['pending', 'available_for_pickup'] }
+    });
+    if (userRes) {
+      userRes.status = 'fulfilled';
+      userRes.fulfilledAt = now;
+      await userRes.save();
+    }
+    const { syncReservationStatuses } = require('./reservationController');
+    await syncReservationStatuses(book._id);
+
     const populated = await Issue.findById(issue._id)
       .populate('book', 'title author isbn bookId shelfLocation image')
       .populate('user', 'name email phone');
@@ -271,8 +301,11 @@ const returnBook = async (req, res, next) => {
     const returnDate = new Date();
     const { lateDays, fineRate, totalFine } = calculateFine(issue.dueDate, returnDate);
 
+    const { returnCondition } = req.body;
     issue.status = 'returned';
     issue.returnDate = returnDate;
+    issue.returnCondition = returnCondition || 'Good';
+    issue.receivedBy = req.user._id;
     await issue.save();
 
     // Increment available book copies
@@ -283,6 +316,26 @@ const returnBook = async (req, res, next) => {
         book.status = 'Available';
       }
       await book.save();
+
+      // Automatically allocate returned copy to the highest priority pending reservation
+      const { syncReservationStatuses } = require('./reservationController');
+      await syncReservationStatuses(book._id);
+    }
+
+    // Check if any student now has an available_for_pickup reservation for this book
+    const Reservation = require('../models/Reservation');
+    const readyReservation = await Reservation.findOne({
+      book: issue.book._id,
+      status: 'available_for_pickup'
+    }).sort({ priority: 1, createdAt: 1 }).populate('user', 'name email');
+
+    let reservationAlert = null;
+    if (readyReservation) {
+      reservationAlert = {
+        studentName: readyReservation.user?.name,
+        studentEmail: readyReservation.user?.email,
+        pickupDeadline: readyReservation.pickupDeadline
+      };
     }
 
     let fineRecord = null;
@@ -300,13 +353,20 @@ const returnBook = async (req, res, next) => {
       });
     }
 
+    let returnMessage = lateDays > 0
+      ? `Book returned successfully (Condition: ${issue.returnCondition}). Overdue by ${lateDays} days. Fine generated: ₹${totalFine}.`
+      : `Book returned successfully on time (Condition: ${issue.returnCondition}). No fine incurred.`;
+
+    if (reservationAlert) {
+      returnMessage += ` 🔔 Reservation Alert: Student ${reservationAlert.studentName} has been notified to pick up this book!`;
+    }
+
     res.json({
       success: true,
-      message: lateDays > 0 
-        ? `Book returned successfully. Overdue by ${lateDays} days. Fine generated: ₹${totalFine}`
-        : 'Book returned successfully on time. No fine incurred.',
+      message: returnMessage,
       issue,
-      fine: fineRecord
+      fine: fineRecord,
+      reservationAlert
     });
   } catch (error) {
     next(error);

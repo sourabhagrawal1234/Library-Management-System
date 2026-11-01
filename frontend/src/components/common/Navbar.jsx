@@ -140,10 +140,10 @@ const Navbar = () => {
                 </div>
                 <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
                   <div style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-heading)' }}>
-                    {user?.name?.split(' ')[0]}
+                    {user?.name ? user.name.split(' ')[0] : 'Student'}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--primary-600)', fontWeight: 600, textTransform: 'uppercase' }}>
-                    {user?.role}
+                    {['user', 'student'].includes(user?.role) ? 'STUDENT' : user?.role}
                   </div>
                 </div>
                 <ChevronDown size={14} color="var(--text-muted)" />
@@ -152,7 +152,9 @@ const Navbar = () => {
               {userDropdownOpen && (
                 <div className="user-dropdown-menu">
                   <div className="dropdown-user-header">
-                    <div className="dropdown-user-name">{user?.name}</div>
+                    <div className="dropdown-user-name">
+                      {user?.name || 'Student'}
+                    </div>
                     <div className="dropdown-user-email">{user?.email}</div>
                   </div>
 
@@ -162,10 +164,10 @@ const Navbar = () => {
                     onClick={() => setUserDropdownOpen(false)}
                   >
                     <LayoutDashboard size={16} />
-                    <span>{user?.role?.toUpperCase()} Dashboard</span>
+                    <span>{['user', 'student'].includes(user?.role) ? 'Student' : user?.role?.toUpperCase()} Dashboard</span>
                   </Link>
 
-                  {user?.role === 'user' && (
+                  {['user', 'student'].includes(user?.role) && (
                     <>
                       <Link
                         to="/user/my-books"
@@ -215,7 +217,7 @@ const Navbar = () => {
                         onClick={() => setUserDropdownOpen(false)}
                       >
                         <ShieldCheck size={16} />
-                        <span>Manage Users</span>
+                        <span>Manage Students</span>
                       </Link>
                       <Link
                         to="/admin/reports"

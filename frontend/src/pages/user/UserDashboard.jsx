@@ -15,7 +15,10 @@ import {
   BookOpen,
   Calendar,
   AlertCircle,
-  CreditCard
+  CreditCard,
+  Bookmark,
+  Sparkles,
+  MapPin
 } from 'lucide-react';
 
 const UserDashboard = () => {
@@ -71,55 +74,135 @@ const UserDashboard = () => {
 
   return (
     <div>
-      {/* Header Greeting (Screen 4 Reference) */}
-      <div style={{ marginBottom: '1.75rem' }}>
+      {/* Header Greeting */}
+      <div style={{ marginBottom: '1.5rem' }}>
         <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>
           Welcome, {user?.name || 'Student'}
         </h1>
         <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
-          Here's what's happening with your library account.
+          Here's what's happening with your library account today.
         </p>
       </div>
 
-      {/* 4 Stat Cards (Screen 4 Reference) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
-        <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid #10b981', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookMarked size={24} />
+      {/* Proactive Due Date Alert Banner (Chapter 2.1 c Solution) */}
+      {stats.overdue > 0 ? (
+        <div
+          style={{
+            padding: '0.9rem 1.25rem',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '10px',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            color: '#991b1b'
+          }}
+        >
+          <AlertOctagon size={20} color="#dc2626" />
+          <div style={{ fontSize: '0.9rem' }}>
+            <strong>Action Required:</strong> You have <strong>{stats.overdue} overdue book(s)</strong>. Please return them to avoid additional daily fines of ₹10/day.
+          </div>
+        </div>
+      ) : stats.dueSoon > 0 ? (
+        <div
+          style={{
+            padding: '0.9rem 1.25rem',
+            backgroundColor: '#fffbeb',
+            border: '1px solid #fde68a',
+            borderRadius: '10px',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            color: '#92400e'
+          }}
+        >
+          <Clock size={20} color="#d97706" />
+          <div style={{ fontSize: '0.9rem' }}>
+            <strong>Due Date Reminder:</strong> You have <strong>{stats.dueSoon} book(s) due within 3 days</strong>. Check your due dates below to return on time.
+          </div>
+        </div>
+      ) : null}
+
+      {/* Ready for Pickup Reservation Banner (Chapter 2.1 e Solution) */}
+      {stats.readyForPickup > 0 && (
+        <div
+          style={{
+            padding: '0.9rem 1.25rem',
+            backgroundColor: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            borderRadius: '10px',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            color: '#065f46'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Sparkles size={20} color="#059669" />
+            <div style={{ fontSize: '0.9rem' }}>
+              <strong>🎉 Reserved Book Available:</strong> A copy of your reserved book has arrived at the circulation counter!
+            </div>
+          </div>
+          <Link to="/user/my-books" className="btn btn-sm btn-primary" style={{ borderRadius: '6px' }}>
+            View Shelf & Pickup Details
+          </Link>
+        </div>
+      )}
+
+      {/* 5 Stat Cards Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+        <div className="card" style={{ padding: '1.1rem 1.25rem', borderLeft: '4px solid #10b981', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookMarked size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Total Issued</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>{stats.totalIssued}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Total Issued</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{stats.totalIssued}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid #f59e0b', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={24} />
+        <div className="card" style={{ padding: '1.1rem 1.25rem', borderLeft: '4px solid #f59e0b', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clock size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Due Soon</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>{stats.dueSoon}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Due Soon</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{stats.dueSoon}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid #ef4444', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AlertOctagon size={24} />
+        <div className="card" style={{ padding: '1.1rem 1.25rem', borderLeft: '4px solid #ef4444', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AlertOctagon size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Overdue</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>{stats.overdue}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Overdue</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{stats.overdue}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IndianRupee size={24} />
+        <div className="card" style={{ padding: '1.1rem 1.25rem', borderLeft: '4px solid #d97706', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Bookmark size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Current Fine</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: stats.currentFine > 0 ? '#dc2626' : '#059669' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Reserved</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{stats.activeReservations || 0}</div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '1.1rem 1.25rem', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IndianRupee size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Current Fine</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: stats.currentFine > 0 ? '#dc2626' : '#059669' }}>
               ₹{stats.currentFine}
             </div>
           </div>
@@ -220,6 +303,25 @@ const UserDashboard = () => {
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {data?.activeReservations && data.activeReservations.length > 0 && (
+              <div className="notification-item">
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Bookmark size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#92400e' }}>
+                    {data.activeReservations[0].status === 'available_for_pickup' ? '🎉 Reserved Book Ready!' : 'Book Reserved (Waitlist)'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    "{data.activeReservations[0].book?.title}" — {data.activeReservations[0].status === 'available_for_pickup' ? `Shelf: ${data.activeReservations[0].book?.shelfLocation || 'Main Stack'}` : 'You are in queue'}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
+                    {data.activeReservations[0].status === 'available_for_pickup' ? 'Ready for collection' : 'In queue'}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="notification-item">
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <CheckCircle2 size={18} />

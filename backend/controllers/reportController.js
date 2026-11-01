@@ -5,6 +5,7 @@ const Issue = require('../models/Issue');
 const Fine = require('../models/Fine');
 const Payment = require('../models/Payment');
 const Category = require('../models/Category');
+const Reservation = require('../models/Reservation');
 
 // @desc    Get metrics for User Dashboard
 // @route   GET /api/reports/user-dashboard
@@ -15,7 +16,7 @@ const getUserDashboardStats = async (req, res, next) => {
     const now = new Date();
 
     const userIssues = await Issue.find({ user: userId })
-      .populate('book', 'title author isbn bookId image')
+      .populate('book', 'title author isbn bookId image shelfLocation')
       .sort({ createdAt: -1 });
 
     const activeIssues = userIssues.filter(i => i.status === 'issued');
@@ -40,6 +41,13 @@ const getUserDashboardStats = async (req, res, next) => {
       .filter(f => f.paymentStatus === 'paid')
       .reduce((sum, f) => sum + f.totalFine, 0);
 
+    const userReservations = await Reservation.find({ user: userId })
+      .populate('book', 'title author isbn bookId shelfLocation image status availableCopies')
+      .sort({ createdAt: -1 });
+
+    const activeReservations = userReservations.filter(r => ['pending', 'available_for_pickup'].includes(r.status));
+    const readyForPickup = userReservations.filter(r => r.status === 'available_for_pickup');
+
     const recentPayments = await Payment.find({ user: userId })
       .populate({
         path: 'fine',
@@ -58,10 +66,13 @@ const getUserDashboardStats = async (req, res, next) => {
         overdue: overdueCount,
         currentFine,
         paidFine,
-        pendingRequests: pendingRequests.length
+        pendingRequests: pendingRequests.length,
+        activeReservations: activeReservations.length,
+        readyForPickup: readyForPickup.length
       },
       recentIssues,
-      recentPayments
+      recentPayments,
+      activeReservations
     });
   } catch (error) {
     next(error);
@@ -94,6 +105,8 @@ const getStaffDashboardStats = async (req, res, next) => {
     const fines = await Fine.find();
     const pendingFines = fines.filter(f => f.paymentStatus === 'pending').reduce((sum, f) => sum + f.totalFine, 0);
 
+    const totalReservations = await Reservation.countDocuments({ status: { $in: ['pending', 'available_for_pickup'] } });
+
     const recentRequests = await Issue.find({ status: 'pending' })
       .populate('user', 'name email phone')
       .populate('book', 'title author isbn bookId availableCopies image')
@@ -115,7 +128,8 @@ const getStaffDashboardStats = async (req, res, next) => {
         pendingRequests,
         overdueBooks,
         pendingFines,
-        returnedBooks
+        returnedBooks,
+        totalReservations
       },
       recentRequests,
       recentReturns
@@ -132,7 +146,7 @@ const getAdminDashboardStats = async (req, res, next) => {
   try {
     const now = new Date();
 
-    const totalUsers = await User.countDocuments({ role: 'user' });
+    const totalUsers = await User.countDocuments({ role: { $in: ['user', 'student'] } });
     const totalStaff = await Staff.countDocuments();
     const totalBooks = await Book.countDocuments();
     

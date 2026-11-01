@@ -6,7 +6,15 @@ const userSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, 'Please provide full name'],
-      trim: true
+      trim: true,
+      minlength: [2, 'Name must be at least 2 characters'],
+      maxlength: [50, 'Name cannot exceed 50 characters'],
+      validate: {
+        validator: function (v) {
+          return /^[a-zA-Z][a-zA-Z\s.'\-]{1,49}$/.test(v);
+        },
+        message: 'Name must contain only letters and spaces (numbers or random symbols are not allowed)'
+      }
     },
     email: {
       type: String,
@@ -24,12 +32,33 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
+      trim: true,
+      validate: {
+        validator: function (v) {
+          if (!v) return true; // Optional on model level if not provided
+          return /^[6-9]\d{9}$/.test(v);
+        },
+        message: 'Phone number must be exactly 10 numeric digits starting with 6, 7, 8, or 9'
+      }
+    },
+    studentId: {
+      type: String,
       trim: true
+    },
+    semYear: {
+      type: String,
+      trim: true,
+      default: '1st Sem / 1st Year'
+    },
+    branch: {
+      type: String,
+      trim: true,
+      default: 'Computer Science & Engineering'
     },
     role: {
       type: String,
-      enum: ['user', 'staff', 'admin'],
-      default: 'user'
+      enum: ['user', 'student', 'staff', 'admin'],
+      default: 'student'
     },
     address: {
       type: String,
@@ -38,6 +67,15 @@ const userSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true
+    },
+    resetPasswordOtp: {
+      type: String
+    },
+    resetPasswordToken: {
+      type: String
+    },
+    resetPasswordExpire: {
+      type: Date
     }
   },
   {
@@ -45,8 +83,21 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Hash password before saving
+// Sanitize phone number before validating
+userSchema.pre('validate', function (next) {
+  if (this.phone) {
+    const { sanitizePhone } = require('../utils/validator');
+    this.phone = sanitizePhone(this.phone);
+  }
+  next();
+});
+
+// Hash password before saving & protect Admin status
 userSchema.pre('save', async function (next) {
+  // Ensure Admin accounts are permanently active to prevent system lockouts
+  if (this.role === 'admin') {
+    this.isActive = true;
+  }
   if (!this.isModified('password')) {
     return next();
   }

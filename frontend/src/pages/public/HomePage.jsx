@@ -204,7 +204,7 @@ const HomePage = () => {
           </div>
           <div>
             <div className="stats-counter-num">1200+</div>
-            <div className="stats-counter-sub">Active Users</div>
+            <div className="stats-counter-sub">Active Students</div>
           </div>
           <div>
             <div className="stats-counter-num">300+</div>

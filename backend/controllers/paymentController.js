@@ -28,56 +28,73 @@ const processPayment = async (req, res, next) => {
 
     // Strict Input Validation by Payment Method (Fail Fast)
     if (paymentMethod === 'UPI') {
+      const cleanUpiId = (upiId || '').toString().trim();
       cleanUtr = (utrNumber || '').toString().trim();
 
-      if (!cleanUtr) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please enter the 12-digit UTR / UPI Reference number from your PhonePe receipt'
-        });
+      // If UPI ID was submitted
+      if (cleanUpiId) {
+        const upiPattern = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+        if (!upiPattern.test(cleanUpiId)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UPI ID format. A valid UPI ID must include "@bank" (e.g., student@okhdfcbank, name@upi, 9876543210@paytm). Random numbers are not allowed.'
+          });
+        }
       }
 
-      // Check strictly 12 numeric digits
-      if (!/^\d{12}$/.test(cleanUtr)) {
+      // If UTR was provided or required
+      if (cleanUtr) {
+        // Check strictly 12 numeric digits
+        if (!/^\d{12}$/.test(cleanUtr)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid UTR format. UPI Reference Number must be exactly 12 numeric digits (e.g. 425619283746). You entered ${cleanUtr.length} digits.`
+          });
+        }
+
+        // Reject all-identical repeating sequences (e.g. 000000000000, 111111111111)
+        if (/^(\d)\1{11}$/.test(cleanUtr)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UTR format. Repeating numbers (like 000000000000 or 111111111111) are invalid.'
+          });
+        }
+
+        // Reject obvious sequential dummy numbers
+        const dummySequences = ['123456789012', '012345678901', '987654321098', '234567890123'];
+        if (dummySequences.includes(cleanUtr)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid UTR format. Sequential numbers like 123456789012 are not valid reference numbers.'
+          });
+        }
+
+        // Anti-Fraud Duplicate Check: Ensure UTR has not been used previously
+        const existingPayment = await Payment.findOne({
+          $or: [
+            { utrNumber: cleanUtr },
+            { transactionId: `UTR-${cleanUtr}` }
+          ]
+        });
+
+        if (existingPayment) {
+          return res.status(400).json({
+            success: false,
+            message: `This UTR (${cleanUtr}) has already been used for another payment. Duplicate transactions are strictly prohibited.`
+          });
+        }
+
+        transactionId = `TXN-LMS-${Date.now().toString().slice(-6)}-${cleanUtr.slice(-4)}`;
+      } else if (cleanUpiId) {
+        // If valid UPI ID was entered, assign generated reference
+        cleanUtr = `${Math.floor(100000000000 + Math.random() * 900000000000)}`;
+        transactionId = generateTransactionId();
+      } else {
         return res.status(400).json({
           success: false,
-          message: `Invalid UTR format. UPI Reference Number must be exactly 12 numeric digits (e.g. 425619283746). You entered ${cleanUtr.length} digits.`
+          message: 'Please provide your valid UPI ID (e.g. student@upi) or 12-digit UPI UTR reference number.'
         });
       }
-
-      // Reject all-identical repeating sequences (e.g. 000000000000, 111111111111)
-      if (/^(\d)\1{11}$/.test(cleanUtr)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid UTR format. Repeating numbers (like 000000000000 or 111111111111) are invalid.'
-        });
-      }
-
-      // Reject obvious sequential dummy numbers
-      const dummySequences = ['123456789012', '012345678901', '987654321098', '234567890123'];
-      if (dummySequences.includes(cleanUtr)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid UTR format. Sequential numbers like 123456789012 are not valid PhonePe reference numbers.'
-        });
-      }
-
-      // Anti-Fraud Duplicate Check: Ensure UTR has not been used previously
-      const existingPayment = await Payment.findOne({
-        $or: [
-          { utrNumber: cleanUtr },
-          { transactionId: `UTR-${cleanUtr}` }
-        ]
-      });
-
-      if (existingPayment) {
-        return res.status(400).json({
-          success: false,
-          message: `This UTR (${cleanUtr}) has already been used for another payment. Duplicate transactions are strictly prohibited.`
-        });
-      }
-
-      transactionId = `UTR-${cleanUtr}`;
     } else if (paymentMethod === 'Card') {
       const cleanCard = (cardNumber || '').toString().replace(/[\s-]/g, '');
       if (!cleanCard || !/^\d{16}$/.test(cleanCard)) {
@@ -91,6 +108,15 @@ const processPayment = async (req, res, next) => {
           success: false,
           message: 'Invalid CVV. Must be 3 or 4 numeric digits.'
         });
+      }
+      if (cardExpiry) {
+        const [expMonth, expYear] = cardExpiry.split('/').map(s => parseInt(s.trim(), 10));
+        if (!expMonth || expMonth < 1 || expMonth > 12) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid Expiry Month. Month must be between 01 and 12.'
+          });
+        }
       }
       transactionId = generateTransactionId();
     } else if (paymentMethod === 'Net Banking') {

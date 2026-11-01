@@ -14,8 +14,11 @@ import HomePage from './pages/public/HomePage';
 import BooksPage from './pages/public/BooksPage';
 import BookDetailsPage from './pages/public/BookDetailsPage';
 import AboutPage from './pages/public/AboutPage';
+import RulesPage from './pages/public/RulesPage';
 import LoginPage from './pages/public/LoginPage';
 import RegisterPage from './pages/public/RegisterPage';
+import ForgotPasswordPage from './pages/public/ForgotPasswordPage';
+import ResetPasswordPage from './pages/public/ResetPasswordPage';
 
 // Student / User Pages
 import UserDashboard from './pages/user/UserDashboard';
@@ -34,6 +37,7 @@ import IssuedBooksPage from './pages/staff/IssuedBooksPage';
 import ReturnBooksPage from './pages/staff/ReturnBooksPage';
 import MembersPage from './pages/staff/MembersPage';
 import FineManagementPage from './pages/staff/FineManagementPage';
+import ReservationsPage from './pages/staff/ReservationsPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -55,8 +59,11 @@ function App() {
           <Route path="/books" element={<BooksPage />} />
           <Route path="/books/:id" element={<BookDetailsPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/rules" element={<RulesPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Student / User Protected Routes */}
           <Route
@@ -72,9 +79,11 @@ function App() {
             <Route path="search-books" element={<BooksPage />} />
             <Route path="books/:id" element={<BookDetailsPage />} />
             <Route path="my-books" element={<MyBooksPage />} />
+            <Route path="reservations" element={<MyBooksPage />} />
             <Route path="my-fines" element={<MyFinesPage />} />
             <Route path="payment/:fineId" element={<PaymentPage />} />
             <Route path="payment-success/:paymentId" element={<PaymentSuccessPage />} />
+            <Route path="transaction/:paymentId" element={<PaymentSuccessPage />} />
             <Route path="payment-history" element={<PaymentHistoryPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
@@ -94,6 +103,7 @@ function App() {
             <Route path="issue-requests" element={<IssueRequestsPage />} />
             <Route path="issued-books" element={<IssuedBooksPage />} />
             <Route path="returns" element={<ReturnBooksPage />} />
+            <Route path="reservations" element={<ReservationsPage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="fines" element={<FineManagementPage />} />
             <Route path="profile" element={<ProfilePage />} />
@@ -116,6 +126,7 @@ function App() {
             <Route path="categories" element={<CategoryManagementPage />} />
             <Route path="issues" element={<IssueRecordsPage />} />
             <Route path="returns" element={<ReturnRecordsPage />} />
+            <Route path="reservations" element={<ReservationsPage />} />
             <Route path="fines" element={<FineManagementPage />} />
             <Route path="payments" element={<PaymentRecordsPage />} />
             <Route path="reports" element={<ReportsPage />} />

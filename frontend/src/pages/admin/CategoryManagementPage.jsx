@@ -67,17 +67,29 @@ const CategoryManagementPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      showToast('Please enter category name', 'error');
+      return;
+    }
+    if (trimmed.length < 2 || trimmed.length > 50) {
+      showToast('Category name must be between 2 and 50 characters', 'error');
+      return;
+    }
+    if (!/^[a-zA-Z][a-zA-Z0-9\s&,\-/]*$/.test(trimmed) || !/[a-zA-Z]{2,}/.test(trimmed)) {
+      showToast('Invalid category name. Must contain valid letters (e.g. Computer Science & AI). Numbers-only or symbols like @#$% are not allowed.', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
       if (editingCategory) {
-        const res = await api.put(`/categories/${editingCategory._id}`, { name, description });
+        const res = await api.put(`/categories/${editingCategory._id}`, { name: trimmed, description });
         if (res.data.success) {
           showToast('Category updated successfully!', 'success');
         }
       } else {
-        const res = await api.post('/categories', { name, description });
+        const res = await api.post('/categories', { name: trimmed, description });
         if (res.data.success) {
           showToast('New category created successfully!', 'success');
         }

@@ -11,6 +11,8 @@ const RegisterPage = () => {
     name: '',
     email: '',
     phone: '',
+    branch: 'Computer Science & Engineering',
+    semYear: '1st Sem / 1st Year',
     password: '',
     confirmPassword: ''
   });
@@ -29,11 +31,30 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { name, email, phone, password, confirmPassword } = formData;
+    const { name, email, phone, password, confirmPassword, branch, semYear } = formData;
 
     if (!name.trim() || !email.trim() || !password) {
       showToast('Please fill in all mandatory fields', 'warning');
       return;
+    }
+
+    const trimmedName = name.trim();
+    if (!/^[a-zA-Z][a-zA-Z\s.'\-]{1,49}$/.test(trimmedName)) {
+      showToast('Name must contain only letters and spaces (2 to 50 characters). Numbers and special symbols like @#$% are not allowed.', 'error');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      showToast('Please enter a valid email address (e.g. name@domain.com)', 'error');
+      return;
+    }
+
+    const cleanPhone = phone.trim().replace(/\D/g, '');
+    if (phone.trim()) {
+      if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+        showToast('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9 (na kam, na jaada).', 'error');
+        return;
+      }
     }
 
     if (password !== confirmPassword) {
@@ -51,7 +72,9 @@ const RegisterPage = () => {
       const newUser = await register({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        phone: phone.trim(),
+        phone: cleanPhone,
+        branch,
+        semYear,
         role: 'user',
         password,
         confirmPassword
@@ -113,10 +136,10 @@ const RegisterPage = () => {
           <div className="auth-form-side" style={{ padding: '2.5rem 3rem' }}>
             <div style={{ marginBottom: '1.25rem' }}>
               <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>
-                Create Your Account
+                Student Registration
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                Fill in your details to register
+                Fill in your details to register as a student member
               </p>
             </div>
 
@@ -148,15 +171,54 @@ const RegisterPage = () => {
               </div>
 
               <div className="form-group" style={{ marginBottom: '0.85rem' }}>
-                <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>Phone Number</label>
+                <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>Phone Number (10 Digits)</label>
                 <input
                   type="tel"
                   name="phone"
+                  maxLength={10}
                   className="form-control"
-                  placeholder="Enter your phone number"
+                  placeholder="10-digit mobile number (e.g. 9876543210)"
                   value={formData.phone}
-                  onChange={handleChange}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                 />
+              </div>
+
+              {/* Student Academic Details (ER / UML Diagram) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>Branch / Stream</label>
+                  <select
+                    name="branch"
+                    className="form-control"
+                    value={formData.branch}
+                    onChange={handleChange}
+                  >
+                    <option value="Computer Science & Engineering">Computer Science</option>
+                    <option value="Information Technology">Information Tech</option>
+                    <option value="Electronics & Communication">Electronics</option>
+                    <option value="Mechanical Engineering">Mechanical</option>
+                    <option value="Civil Engineering">Civil</option>
+                    <option value="Management Studies">Management</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>Semester / Year</label>
+                  <select
+                    name="semYear"
+                    className="form-control"
+                    value={formData.semYear}
+                    onChange={handleChange}
+                  >
+                    <option value="1st Sem / 1st Year">1st Sem (1st Year)</option>
+                    <option value="2nd Sem / 1st Year">2nd Sem (1st Year)</option>
+                    <option value="3rd Sem / 2nd Year">3rd Sem (2nd Year)</option>
+                    <option value="4th Sem / 2nd Year">4th Sem (2nd Year)</option>
+                    <option value="5th Sem / 3rd Year">5th Sem (3rd Year)</option>
+                    <option value="6th Sem / 3rd Year">6th Sem (3rd Year)</option>
+                    <option value="7th Sem / 4th Year">7th Sem (4th Year)</option>
+                    <option value="8th Sem / 4th Year">8th Sem (4th Year)</option>
+                  </select>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
@@ -223,7 +285,7 @@ const RegisterPage = () => {
                 style={{ width: '100%', padding: '0.85rem', fontSize: '1rem', borderRadius: '10px' }}
               >
                 <UserPlus size={18} />
-                <span>{submitting ? 'Registering...' : 'Register'}</span>
+                <span>{submitting ? 'Registering...' : 'Register as Student'}</span>
               </button>
             </form>
 

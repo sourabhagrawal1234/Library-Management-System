@@ -2,9 +2,24 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Modal from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
-import { ShieldCheck, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Building, BadgePercent } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import {
+  ShieldCheck,
+  UserPlus,
+  Edit2,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  Building,
+  BadgePercent,
+  CheckCircle2,
+  XCircle,
+  UserCheck,
+  UserX
+} from 'lucide-react';
 
 const ManageStaffPage = () => {
+  const { user: currentUser } = useAuth();
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,12 +87,34 @@ const ManageStaffPage = () => {
   };
 
   const handleToggleStatus = async (staff) => {
+    if (staff.user?.role === 'admin') {
+      showToast('Administrator accounts are permanently active and cannot be deactivated.', 'warning');
+      return;
+    }
+    if (currentUser && (staff.user?._id === currentUser._id || staff.user?._id === currentUser.id)) {
+      showToast('You cannot deactivate your own logged-in account.', 'warning');
+      return;
+    }
+
+    const isActivating = !staff.isActive;
+    const staffName = staff.user?.name || 'Staff Member';
+    const confirmMessage = isActivating
+      ? `Are you sure you want to ACTIVATE staff member "${staffName}"?\n\nTheir circulation desk and library management access will be restored.`
+      : `Are you sure you want to DEACTIVATE staff member "${staffName}"?\n\nDeactivated staff will NOT be able to log in or manage book circulations.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
     try {
       const res = await api.put(`/staff/${staff._id}`, {
-        isActive: !staff.isActive
+        isActive: isActivating
       });
       if (res.data.success) {
-        showToast('Staff status updated', 'info');
+        showToast(
+          `Staff member "${staffName}" has been ${isActivating ? 'ACTIVATED' : 'DEACTIVATED'} successfully!`,
+          isActivating ? 'success' : 'warning'
+        );
         fetchStaff();
       }
     } catch (err) {
@@ -85,7 +122,15 @@ const ManageStaffPage = () => {
     }
   };
 
-  const handleDelete = async (id, name) => {
+  const handleDelete = async (id, name, staffUser) => {
+    if (staffUser?.role === 'admin') {
+      showToast('Administrator accounts cannot be deleted.', 'warning');
+      return;
+    }
+    if (currentUser && (staffUser?._id === currentUser._id || staffUser?._id === currentUser.id)) {
+      showToast('You cannot delete your own logged-in account.', 'warning');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to remove staff member "${name}"?`)) {
       return;
     }
@@ -102,15 +147,46 @@ const ManageStaffPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const trimmedName = (formData.name || '').trim();
+    if (!trimmedName) {
+      showToast('Please provide staff full name', 'warning');
+      return;
+    }
+    if (!/^[a-zA-Z][a-zA-Z\s.'\-]{1,49}$/.test(trimmedName)) {
+      showToast('Staff name must contain only letters and spaces (2 to 50 characters). Numbers and special characters are not allowed.', 'error');
+      return;
+    }
+
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) {
+      showToast('Please provide a valid email address', 'error');
+      return;
+    }
+
+    const cleanPhone = (formData.phone || '').trim().replace(/\D/g, '');
+    if (formData.phone && formData.phone.trim()) {
+      if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+        showToast('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9 (na kam, na jaada).', 'error');
+        return;
+      }
+    }
+
+    if (!editingStaff && (!formData.employeeId || !/^[a-zA-Z0-9\-_]{2,25}$/.test(formData.employeeId.trim()))) {
+      showToast('Invalid Employee ID. Alphanumeric and hyphens only (e.g. EMP-101).', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (editingStaff) {
-        const res = await api.put(`/staff/${editingStaff._id}`, formData);
+        const payload = { ...formData, name: trimmedName, phone: cleanPhone };
+        const res = await api.put(`/staff/${editingStaff._id}`, payload);
         if (res.data.success) {
           showToast('Staff details updated successfully!', 'success');
         }
       } else {
-        const res = await api.post('/staff', formData);
+        const payload = { ...formData, name: trimmedName, phone: cleanPhone };
+        const res = await api.post('/staff', payload);
         if (res.data.success) {
           showToast('New staff member added successfully!', 'success');
         }
@@ -186,20 +262,117 @@ const ManageStaffPage = () => {
                   <td>{s.department}</td>
                   <td>{s.designation}</td>
                   <td>
-                    <button
-                      onClick={() => handleToggleStatus(s)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
-                    >
-                      {s.isActive ? (
-                        <span style={{ color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <ToggleRight size={22} /> Active
-                        </span>
-                      ) : (
-                        <span style={{ color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <ToggleLeft size={22} /> Inactive
-                        </span>
-                      )}
-                    </button>
+                    {s.user?.role === 'admin' ? (
+                      <span
+                        style={{
+                          color: '#059669',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.8rem',
+                          padding: '0.2rem 0.55rem',
+                          background: '#ecfdf5',
+                          borderRadius: '6px',
+                          border: '1px solid #a7f3d0'
+                        }}
+                        title="Administrator accounts cannot be deactivated"
+                      >
+                        <ShieldCheck size={16} /> Always Active
+                      </span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
+                        {/* Current Status Badge */}
+                        {s.isActive ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              backgroundColor: '#dcfce7',
+                              color: '#15803d',
+                              border: '1px solid #86efac'
+                            }}
+                            title="Staff member is currently active"
+                          >
+                            <CheckCircle2 size={12} /> Active
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              backgroundColor: '#fee2e2',
+                              color: '#b91c1c',
+                              border: '1px solid #fca5a5'
+                            }}
+                            title="Staff member is currently inactive/deactivated"
+                          >
+                            <XCircle size={12} /> Inactive
+                          </span>
+                        )}
+
+                        {/* Explicit Action Button */}
+                        {s.isActive ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(s)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '5px',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              color: '#b91c1c',
+                              backgroundColor: '#fff',
+                              border: '1px solid #fca5a5',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            title={`Click to DEACTIVATE ${s.user?.name || 'Staff'}`}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
+                          >
+                            <UserX size={12} /> Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(s)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '5px',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              color: '#15803d',
+                              backgroundColor: '#fff',
+                              border: '1px solid #86efac',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            title={`Click to ACTIVATE ${s.user?.name || 'Staff'}`}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f0fdf4'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
+                          >
+                            <UserCheck size={12} /> Activate
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -210,13 +383,15 @@ const ManageStaffPage = () => {
                       >
                         <Edit2 size={14} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(s._id, s.user?.name)}
-                        className="btn btn-danger btn-sm"
-                        style={{ padding: '0.35rem 0.55rem' }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {s.user?.role !== 'admin' && (
+                        <button
+                          onClick={() => handleDelete(s._id, s.user?.name, s.user)}
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: '0.35rem 0.55rem' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -270,12 +445,14 @@ const ManageStaffPage = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Phone</label>
+              <label className="form-label">Phone (10 Digits)</label>
               <input
                 type="tel"
+                maxLength={10}
                 className="form-control"
+                placeholder="10-digit mobile number"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
               />
             </div>
           </div>

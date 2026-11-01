@@ -24,8 +24,18 @@ const BookCard = ({ book, onRequest, requestingId }) => {
               <CheckCircle2 size={12} /> Available
             </span>
           ) : (
-            <span className="badge badge-unavailable">
-              <XCircle size={12} /> Unavailable
+            <span
+              className="badge"
+              style={{
+                backgroundColor: '#fff7ed',
+                color: '#c2410c',
+                border: '1px solid #ffedd5',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <XCircle size={12} /> Out of Stock (Can Reserve)
             </span>
           )}
         </div>
@@ -35,9 +45,15 @@ const BookCard = ({ book, onRequest, requestingId }) => {
         <h3 className="book-title" title={book.title} style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.25rem', color: '#0f172a' }}>
           {book.title}
         </h3>
-        <p className="book-author" style={{ fontSize: '0.825rem', color: '#64748b', marginBottom: '0.75rem' }}>
+        <p className="book-author" style={{ fontSize: '0.825rem', color: '#64748b', marginBottom: '0.6rem' }}>
           {book.author}
         </p>
+
+        {/* Shelf Location (Chapter 1.1 a & Solution 2.1 a) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#475569', marginBottom: '0.65rem' }}>
+          <MapPin size={13} color="#2563eb" />
+          <span>Shelf: <strong>{book.shelfLocation || 'General Stack A'}</strong></span>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span
@@ -61,10 +77,10 @@ const BookCard = ({ book, onRequest, requestingId }) => {
         <div className="book-actions" style={{ marginTop: 'auto' }}>
           <Link
             to={window.location.pathname.startsWith('/user/') ? `/user/books/${book._id}` : `/books/${book._id}`}
-            className="btn btn-primary btn-sm"
+            className={`btn ${isAvailable ? 'btn-primary' : 'btn-outline-primary'} btn-sm`}
             style={{ width: '100%', borderRadius: '8px', padding: '0.55rem' }}
           >
-            View Details
+            {isAvailable ? 'View Details' : 'View & Reserve Book'}
           </Link>
         </div>
       </div>

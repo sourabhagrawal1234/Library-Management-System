@@ -1,5 +1,6 @@
 const Book = require('../models/Book');
 const Category = require('../models/Category');
+const { isValidBookTitle, isValidAuthor, isValidISBN, isValidIdentifier, isPositiveInteger } = require('../utils/validator');
 
 // @desc    Get all books with advanced search, category filter, availability filter
 // @route   GET /api/books
@@ -124,20 +125,57 @@ const createBook = async (req, res, next) => {
       });
     }
 
-    // Check duplicate bookId or ISBN
-    const existingBook = await Book.findOne({
-      $or: [{ bookId: bookId.trim() }, { isbn: isbn.trim() }]
-    });
-
-    if (existingBook) {
-      return res.status(409).json({
+    if (!isValidIdentifier(bookId)) {
+      return res.status(400).json({
         success: false,
-        message: 'A book with this Book ID or ISBN already exists'
+        message: 'Invalid Book ID format. Alphanumeric and hyphens only (e.g. BK-CS-101).'
       });
     }
 
-    const total = Number(totalCopies) || 1;
+    if (!isValidBookTitle(title)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Book Title. Title must contain valid alphabets (2 to 150 characters). Numbers-only or invalid symbols are not allowed.'
+      });
+    }
+
+    if (!isValidAuthor(author)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Author name. Author must contain valid alphabetic characters (2 to 80 characters).'
+      });
+    }
+
+    if (!isValidISBN(isbn)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ISBN. Must be 10 or 13 digits (e.g. 978-0132350884).'
+      });
+    }
+
+    if (!isPositiveInteger(totalCopies, 1, 1000)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Total copies must be a positive integer between 1 and 1000.'
+      });
+    }
+
+    const total = Number(totalCopies);
     const available = availableCopies !== undefined ? Number(availableCopies) : total;
+
+    if (!Number.isInteger(available) || available < 0 || available > total) {
+      return res.status(400).json({
+        success: false,
+        message: `Available copies must be a valid integer between 0 and total copies (${total}).`
+      });
+    }
+
+    if (publicationYear && !isPositiveInteger(publicationYear, 1000, new Date().getFullYear() + 1)) {
+      return res.status(400).json({
+        success: false,
+        message: `Publication Year must be a valid 4-digit year (1000 to ${new Date().getFullYear() + 1}).`
+      });
+    }
 
     const book = await Book.create({
       bookId: bookId.trim(),
@@ -197,17 +235,53 @@ const updateBook = async (req, res, next) => {
       status
     } = req.body;
 
-    if (bookId) book.bookId = bookId.trim();
-    if (title) book.title = title.trim();
-    if (author) book.author = author.trim();
-    if (isbn) book.isbn = isbn.trim();
+    if (bookId) {
+      if (!isValidIdentifier(bookId)) {
+        return res.status(400).json({ success: false, message: 'Invalid Book ID format. Alphanumeric and hyphens only.' });
+      }
+      book.bookId = bookId.trim();
+    }
+    if (title !== undefined) {
+      if (!isValidBookTitle(title)) {
+        return res.status(400).json({ success: false, message: 'Invalid Book Title. Must contain alphabets (2-150 characters).' });
+      }
+      book.title = title.trim();
+    }
+    if (author !== undefined) {
+      if (!isValidAuthor(author)) {
+        return res.status(400).json({ success: false, message: 'Invalid Author name. Must contain alphabetic characters (2-80 characters).' });
+      }
+      book.author = author.trim();
+    }
+    if (isbn !== undefined) {
+      if (!isValidISBN(isbn)) {
+        return res.status(400).json({ success: false, message: 'Invalid ISBN. Must be 10 or 13 digits.' });
+      }
+      book.isbn = isbn.trim();
+    }
     if (category) book.category = category;
     if (publisher !== undefined) book.publisher = publisher;
-    if (publicationYear !== undefined) book.publicationYear = publicationYear;
+    if (publicationYear !== undefined) {
+      if (publicationYear && !isPositiveInteger(publicationYear, 1000, new Date().getFullYear() + 1)) {
+        return res.status(400).json({ success: false, message: 'Invalid Publication Year.' });
+      }
+      book.publicationYear = Number(publicationYear);
+    }
     if (description !== undefined) book.description = description;
     if (shelfLocation) book.shelfLocation = shelfLocation.trim();
-    if (totalCopies !== undefined) book.totalCopies = Number(totalCopies);
-    if (availableCopies !== undefined) book.availableCopies = Number(availableCopies);
+    if (totalCopies !== undefined) {
+      if (!isPositiveInteger(totalCopies, 1, 1000)) {
+        return res.status(400).json({ success: false, message: 'Total copies must be an integer between 1 and 1000.' });
+      }
+      book.totalCopies = Number(totalCopies);
+    }
+    if (availableCopies !== undefined) {
+      const avail = Number(availableCopies);
+      if (!Number.isInteger(avail) || avail < 0 || avail > book.totalCopies) {
+        return res.status(400).json({ success: false, message: `Available copies must be an integer between 0 and total copies (${book.totalCopies}).` });
+      }
+      book.availableCopies = avail;
+    }
     if (image) book.image = image;
 
     if (book.availableCopies <= 0) {
@@ -219,6 +293,9 @@ const updateBook = async (req, res, next) => {
     }
 
     await book.save();
+
+    const { syncReservationStatuses } = require('./reservationController');
+    await syncReservationStatuses(book._id);
 
     const updatedBook = await Book.findById(book._id).populate('category', 'name');
 

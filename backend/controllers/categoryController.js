@@ -1,5 +1,6 @@
 const Category = require('../models/Category');
 const Book = require('../models/Book');
+const { isValidCategoryName } = require('../utils/validator');
 
 // @desc    Get all categories with book counts
 // @route   GET /api/categories
@@ -43,6 +44,13 @@ const createCategory = async (req, res, next) => {
       });
     }
 
+    if (!isValidCategoryName(name)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category name. Must contain only letters, spaces, and valid separators like & or - (2 to 50 characters). Pure numbers or special symbols like @#$% are not allowed.'
+      });
+    }
+
     const exists = await Category.findOne({ name: new RegExp(`^${name.trim()}$`, 'i') });
     if (exists) {
       return res.status(409).json({
@@ -81,7 +89,15 @@ const updateCategory = async (req, res, next) => {
       });
     }
 
-    if (name) category.name = name.trim();
+    if (name !== undefined) {
+      if (!isValidCategoryName(name)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid category name. Must contain only letters, spaces, and valid separators like & or - (2 to 50 characters). Pure numbers or special symbols like @#$% are not allowed.'
+        });
+      }
+      category.name = name.trim();
+    }
     if (description !== undefined) category.description = description.trim();
     if (status) category.status = status;
 

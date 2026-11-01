@@ -22,29 +22,49 @@ const BookDetailsPage = () => {
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
+  const [reserving, setReserving] = useState(false);
+  const [userReservation, setUserReservation] = useState(null);
+  const [claiming, setClaiming] = useState(false);
 
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const isEmbedded = location.pathname.startsWith('/user/');
 
-  useEffect(() => {
-    const fetchBook = async () => {
-      try {
-        const res = await api.get(`/books/${id}`);
-        if (res.data.success) {
-          setBook(res.data.book);
-        }
-      } catch (err) {
-        console.error('Failed to load book:', err);
-        showToast('Failed to load book details', 'error');
-      } finally {
-        setLoading(false);
+  const fetchBookAndReservation = async () => {
+    try {
+      const res = await api.get(`/books/${id}`);
+      if (res.data.success) {
+        setBook(res.data.book);
       }
-    };
-    fetchBook();
-  }, [id, showToast]);
+
+      if (isAuthenticated) {
+        try {
+          const rRes = await api.get('/reservations/my');
+          if (rRes.data.success && rRes.data.reservations) {
+            const match = rRes.data.reservations.find(
+              (r) =>
+                (r.book?._id === id || r.book === id) &&
+                ['pending', 'available_for_pickup'].includes(r.status)
+            );
+            setUserReservation(match || null);
+          }
+        } catch (rErr) {
+          console.error('Failed to load user reservations:', rErr);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load book:', err);
+      showToast('Failed to load book details', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBookAndReservation();
+  }, [id, isAuthenticated, showToast]);
 
   const handleRequest = async () => {
     if (!isAuthenticated) {
@@ -58,16 +78,65 @@ const BookDetailsPage = () => {
       const res = await api.post('/issues/request', { bookId: book._id });
       if (res.data.success) {
         showToast(res.data.message || 'Book request submitted successfully!', 'success');
-        // Refresh book
-        const refreshed = await api.get(`/books/${id}`);
-        if (refreshed.data.success) {
-          setBook(refreshed.data.book);
-        }
+        fetchBookAndReservation();
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Failed to submit book request', 'error');
     } finally {
       setRequesting(false);
+    }
+  };
+
+  const handleReserve = async () => {
+    if (!isAuthenticated) {
+      showToast('Please login to reserve this book', 'warning');
+      navigate('/login');
+      return;
+    }
+
+    setReserving(true);
+    try {
+      const res = await api.post('/reservations', { bookId: book._id });
+      if (res.data.success) {
+        showToast(res.data.message || 'Book reserved successfully!', 'success');
+        fetchBookAndReservation();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to reserve book', 'error');
+    } finally {
+      setReserving(false);
+    }
+  };
+
+  const handleClaimReservation = async () => {
+    if (!userReservation) return;
+    setClaiming(true);
+    try {
+      const res = await api.post(`/reservations/${userReservation._id}/claim`);
+      if (res.data.success) {
+        showToast(res.data.message || 'Book claim submitted! Please collect from library desk.', 'success');
+        fetchBookAndReservation();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to claim reservation', 'error');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleCancelReservation = async () => {
+    if (!userReservation) return;
+    if (!window.confirm('Are you sure you want to cancel your reservation for this book?')) return;
+
+    try {
+      const res = await api.put(`/reservations/${userReservation._id}/cancel`);
+      if (res.data.success) {
+        showToast('Reservation cancelled successfully', 'info');
+        setUserReservation(null);
+        fetchBookAndReservation();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to cancel reservation', 'error');
     }
   };
 
@@ -172,7 +241,55 @@ const BookDetailsPage = () => {
             />
           </div>
           <div style={{ marginTop: '1.5rem', width: '100%', maxWidth: '360px' }}>
-            {isAvailable ? (
+            {userReservation ? (
+              <div
+                style={{
+                  padding: '1.25rem',
+                  borderRadius: '12px',
+                  backgroundColor: userReservation.status === 'available_for_pickup' ? '#ecfdf5' : '#fffbeb',
+                  border: userReservation.status === 'available_for_pickup' ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: userReservation.status === 'available_for_pickup' ? '#065f46' : '#92400e', marginBottom: '0.5rem' }}>
+                  <Bookmark size={18} />
+                  <span>
+                    {userReservation.status === 'available_for_pickup'
+                      ? '🎉 Ready for Collection at Counter!'
+                      : `Reserved (Queue Position #${userReservation.queuePosition || userReservation.priority})`}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: userReservation.status === 'available_for_pickup' ? '#047857' : '#78350f', margin: 0, lineHeight: 1.4 }}>
+                  {userReservation.status === 'available_for_pickup'
+                    ? `Great news! A physical copy is held for you at shelf "${book.shelfLocation || 'General Stack A'}". Please pick it up from the library desk.`
+                    : 'You are on the reservation waitlist. The system will alert you as soon as this book is returned.'}
+                </p>
+                {userReservation.pickupDeadline && (
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626', marginTop: '0.5rem' }}>
+                    Pickup Deadline: {new Date(userReservation.pickupDeadline).toLocaleDateString()}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  {userReservation.status === 'available_for_pickup' && (
+                    <button
+                      onClick={handleClaimReservation}
+                      disabled={claiming}
+                      className="btn btn-success btn-sm"
+                      style={{ flex: 1, borderRadius: '8px', fontWeight: 600 }}
+                    >
+                      {claiming ? 'Submitting Claim...' : 'Claim & Request Issue'}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleCancelReservation}
+                    className="btn btn-outline-danger btn-sm"
+                    style={{ flex: userReservation.status === 'available_for_pickup' ? '0 0 auto' : 1, width: userReservation.status === 'available_for_pickup' ? 'auto' : '100%', borderRadius: '8px' }}
+                  >
+                    Cancel Reservation
+                  </button>
+                </div>
+              </div>
+            ) : isAvailable ? (
               <button
                 onClick={handleRequest}
                 disabled={requesting}
@@ -183,13 +300,28 @@ const BookDetailsPage = () => {
                 <span>{requesting ? 'Processing Request...' : 'Request This Book'}</span>
               </button>
             ) : (
-              <button
-                disabled
-                className="btn btn-secondary btn-lg"
-                style={{ width: '100%', opacity: 0.6, cursor: 'not-allowed' }}
-              >
-                Currently Unavailable
-              </button>
+              <div>
+                <button
+                  onClick={handleReserve}
+                  disabled={reserving}
+                  className="btn btn-lg"
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#d97706',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.25)'
+                  }}
+                >
+                  <Bookmark size={18} />
+                  <span>{reserving ? 'Reserving Book...' : 'Reserve This Book (आरक्षित करें)'}</span>
+                </button>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem', lineHeight: 1.35 }}>
+                  Chapter 2.1 e Solution: Reserve now to join the queue. You will be automatically notified when this book is returned.
+                </p>
+              </div>
             )}
           </div>
         </div>
